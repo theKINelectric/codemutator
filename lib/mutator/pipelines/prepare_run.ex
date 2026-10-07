@@ -116,6 +116,12 @@ defmodule Mutator.Pipelines.PrepareRun do
     selected = limit_sites(sites, run_limit(data.run_id))
     count = Runs.insert_sites(data.run_id, selected)
 
+    Runs.transition(Runs.get_run(data.run_id), "scanning", %{
+      baseline_ms: data.baseline_ms,
+      mutant_timeout_ms: data.mutant_timeout_ms,
+      selected_sites: count
+    })
+
     %{
       data
       | scan_result: %{

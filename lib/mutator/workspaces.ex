@@ -191,11 +191,21 @@ defmodule Mutator.Workspaces do
         if File.regular?(s), do: File.cp!(s, Path.join(dest, f))
       end)
 
-      # A subject's tests live beside the scoped code and must run: copy any
-      # top-level test dir along with the scope.
-      Enum.each(~w(test tests spec), fn d ->
+      # Tests live beside the scoped code, and builds need their inputs:
+      # config, vendored deps, priv (migrations/static), assets. Missing any
+      # of these turns `mix test` into an interactive Hex prompt that hangs
+      # to the deadline (observed in the self-hosting dogfood).
+      extra_dirs = ~w(test tests spec config deps priv assets) ++
+                     ~w(gradle gradlew build.gradle settings.gradle Packages Package.swift)
+
+      Enum.each(extra_dirs, fn d ->
         sdir = Path.join(src, d)
         if File.dir?(sdir), do: copy_tree(sdir, Path.join(dest, d), excludes)
+      end)
+
+      Enum.each(~w(gradlew), fn f ->
+        sfile = Path.join(src, f)
+        if File.regular?(sfile), do: File.cp!(sfile, Path.join(dest, f))
       end)
 
       case File.dir?(Path.join(src, scope)) do

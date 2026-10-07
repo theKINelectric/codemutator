@@ -24,13 +24,16 @@ config :mutator,
   workspace_root: Path.expand("../temporary_subject", __DIR__),
   # Copy exclusions target VCS metadata and original build caches only;
   # tests and vendored dependencies are always copied (MVP_PLAN.md §3).
+  # rsync patterns, anchored with a leading "/" so they match only the
+  # subject's own root: `deps/<gitdep>/.git` must survive or mix declares
+  # the dependency unavailable (observed with heroicons in the dogfood).
   copy_excludes: [
-    ".git",
-    ".hg",
-    ".zig-cache",
-    "zig-out",
-    "_build",
-    ".elixir_ls",
+    "/.git",
+    "/.hg",
+    "/.zig-cache",
+    "/zig-out",
+    "/_build",
+    "/.elixir_ls",
     ".DS_Store"
   ]
 

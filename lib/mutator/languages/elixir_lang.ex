@@ -27,13 +27,19 @@ defmodule Mutator.Languages.ElixirLang do
   @impl true
   def preflight(subject_root, worker) do
     with {:ok, mix} <- find_mix(subject_root) do
+      user_home = System.user_home() || worker.home
+
       {:ok,
        %{
          argv: [mix, "test", "--color"],
          env: %{
            "MIX_ENV" => "test",
            "HOME" => worker.home,
-           "MIX_BUILD_PATH" => "_build"
+           # Reuse the service user's Hex/Rebar install: mix loads Hex for
+           # lock verification even with vendored deps and must never fall
+           # into an interactive install prompt (observed in the dogfood).
+           "MIX_HOME" => Path.join(user_home, ".mix"),
+           "HEX_HOME" => Path.join(user_home, ".hex")
          }
        }}
     end
