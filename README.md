@@ -1,4 +1,6 @@
-# Mutator — mutation testing as a service
+# 💥🔫 codeMUTATOR
+
+Mutation testing as a service · developed by 🛸🕳️ **iStellar~iModal**
 
 A standalone web service inspired by [unclebob's
 mutator](https://codeberg.org/unclebob/mutator.mirror) (read-only reference at
@@ -22,10 +24,45 @@ compile failures as kills (MVP_PLAN.md §1).
 
 ## Run it
 
+Development:
+
 ```bash
 mix setup          # deps + sqlite + assets
-mix phx.server     # http://localhost:4000/runs
+mix phx.server     # http://localhost:4300/runs
 ```
+
+Production (this host): `/Users/lloyd/PRODUCTION_SERVERS/apps/codemutator` —
+`bin/mutator stop|start` (via the `start` launcher; loopback :4300, SQLite and
+workspaces under its `data/` directory).
+
+## Agents
+
+Most consumers of this service are agents. Three first-class interfaces:
+
+**CLI** (`bin/codemutator`, pure python3, no deps):
+
+```bash
+bin/codemutator run /abs/path/to/project --scope lib/ --limit 12 --wait
+bin/codemutator outcomes <id> survived
+bin/codemutator cancel <id>
+bin/codemutator info
+```
+
+**JSON API** (loopback, no auth): `POST /api/runs`, `GET /api/runs/:id`,
+`GET /api/runs/:id/outcomes`, `POST /api/runs/:id/cancel`, service card at
+`GET /agents.json`. Human-readable instructions live at `/agents`.
+
+**MCP server** (`bin/codemutator_mcp.py`): tools `submit_run`, `get_run`,
+`list_outcomes`, `cancel_run`:
+
+```json
+{ "mcpServers": { "codemutator": {
+    "command": "/Volumes/Centaurus-A/__centaurus_repos/mutator/bin/codemutator_mcp.py",
+    "env": { "CODEMUTATOR_URL": "http://localhost:4300" } } } }
+```
+
+An agent skill is installed at `~/.agents/skills/codemutator/` (and shipped in
+`skills/codemutator/`).
 
 Submit an absolute path (e.g. `/Volumes/.../honey_badger`), optionally with a
 path filter (`src/`) and a mutant limit for a first bounded run. The original

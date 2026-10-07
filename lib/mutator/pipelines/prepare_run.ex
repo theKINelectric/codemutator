@@ -16,9 +16,11 @@ defmodule Mutator.Pipelines.PrepareRun do
   alias Mutator.{Languages.Detector, Runs, Workspaces}
   alias Mutator.Execution.ProcessRunner
 
-  @baseline_deadline_ms 10 * 60_000
+  # Elixir subjects cold-compile the whole dependency tree in the baseline
+  # copy; 30 minutes covers Phoenix-scale projects on this host.
+  @baseline_deadline_ms 30 * 60_000
   @baseline_floor_ms 30_000
-  @mutant_cap_ms 10 * 60_000
+  @mutant_cap_ms 20 * 60_000
   @run_budget_ms 30 * 60_000
 
   pipe :prepare_workspace
@@ -133,7 +135,9 @@ defmodule Mutator.Pipelines.PrepareRun do
   # -- helpers ---------------------------------------------------------------
 
   defp mutant_timeout(baseline_ms) do
-    max(@baseline_floor_ms, 10 * baseline_ms) |> min(@mutant_cap_ms)
+    # Warm-lane mutants recompile one file, not the tree: 3x the (cold)
+    # baseline is generous headroom without timing out healthy runs.
+    max(@baseline_floor_ms, 3 * baseline_ms) |> min(@mutant_cap_ms)
   end
 
   # Path substring filter from the submit form, e.g. "src/" narrows the
