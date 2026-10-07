@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""codeMUTATOR agent CLI — submit a local codebase for mutation testing.
+
+Subcommands:
+  run PATH [--scope PREFIX] [--limit N] [--budget-ms MS] [--wait]
+  status RUN_ID
+  outcomes RUN_ID [killed|survived|invalid|error]
+  wait RUN_ID
+  cancel RUN_ID
+  info
+
+Instance selectable via CODEMUTATOR_URL (default http://localhost:4300).
+Exit codes: 0 ok, 1 HTTP/API error, 2 usage.
+"""
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+
+BASE = os.environ.get("CODEMUTATOR_URL", "http://localhost:4300").rstrip("/")
+
+
+def http(method, path, body=None):
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(
+        BASE + path, data=data, method=method,
+        headers={"content-type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.load(resp)
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.load(e)
+        except Exception:
+            err = {}
+        print(f"HTTP {e.code}: {err.get('error', e.reason)}", file=sys.stderr)
+        sys.exit(1)
+    except urllib.error.URLError as e:
+        print(f"cannot reach {BASE}: {e.reason}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_run(args):
+    path = args.pop(0) if args else None
+    if not path or not path.startswith("/"):
+        print("run: absolute PATH required", file=sys.stderr)
+        sys.exit(2)
+    opts = {"scope_filter": None, "mutant_limit": None, "run_budget_ms": None}
+    wait = False
+    while args:
+        a = args.pop(0)
+        if a == "--scope":
+            opts["scope_filter"] = args.pop(0)
+        elif a == "--limit":
+            opts["mutant_limit"] = int(args.pop(0))
+        elif a == "--budget-ms":
+            opts["run_budget_ms"] = int(args.pop(0))
+        elif a == "--wait":
+            wait = True
+        else:
+            print(f"unknown flag: {a}", file=sys.stderr)
+            sys.exit(2)
+    body = {"source_path": path}
+    body.update({k: v for k, v in opts.items() if v is not None})
+    run = http("POST", "/api/runs", body)
+    print(json.dumps(run, indent=2))
+    if wait:
+        cmd_wait([str(run["id"])])
+
+
+def cmd_wait(args):
+    rid = args[0]
+    while True:
+        run = http("GET", f"/api/runs/{rid}")
+        if run["terminal"]:
+            print(json.dumps(run, indent=2))
+            return
+        time.sleep(5)
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args.pop(0) if args else "help"
+    if cmd == "run":
+        cmd_run(args)
+    elif cmd == "status":
+        print(json.dumps(http("GET", f"/api/runs/{args[0]}"), indent=2))
+    elif cmd == "wait":
+        cmd_wait(args)
+    elif cmd == "outcomes":
+        data = http("GET", f"/api/runs/{args[0]}/outcomes")
+        if len(args) > 1:
+            data["outcomes"] = [o for o in data["outcomes"] if o["status"] == args[1]]
+        print(json.dumps(data, indent=2))
+    elif cmd == "cancel":
+        print(json.dumps(http("POST", f"/api/runs/{args[0]}/cancel"), indent=2))
+    elif cmd == "info":
+        print(json.dumps(http("GET", "/agents.json"), indent=2))
+    else:
+        print(__doc__)
+
+
+if __name__ == "__main__":
+    main()

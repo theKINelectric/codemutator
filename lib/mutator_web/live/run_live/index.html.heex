@@ -1,0 +1,54 @@
+<div class="mx-auto max-w-4xl px-4 py-8">
+  <h1 class="text-2xl font-black tracking-tight text-slate-900">💥🔫 code<span class="text-rose-500">MUTATOR</span></h1>
+  <p class="mt-1 text-sm text-slate-600">
+    Mutation testing as a service for Elixir, Zig, Kotlin and Swift. The subject is cloned into
+    <code class="rounded bg-slate-100 px-1">temporary_subject/</code> and never touched.
+    Agents: <.link href="/agents" class="text-sky-700 hover:underline">CLI &amp; JSON API instructions</.link>.
+  </p>
+
+  <.simple_form for={@form} phx-submit="submit" class="mt-6">
+    <.input field={@form[:source_path]} label="Local subject directory (absolute path)" placeholder="/path/to/project" required />
+    <.input field={@form[:mutant_limit]} label="Mutant limit (optional)" placeholder="e.g. 10 for a first bounded run" />
+    <.input field={@form[:scope_filter]} label="Path filter (optional)" placeholder="e.g. src/ to mutate only the main tree" />
+    <:actions>
+      <.button phx-disable-with="Queueing…">Queue mutation run</.button>
+    </:actions>
+  </.simple_form>
+
+  <h2 class="mt-10 text-lg font-semibold text-slate-900">Runs</h2>
+
+  <div class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+    <div :for={run <- @runs} class="flex items-center gap-4 px-4 py-3">
+      <.link href={~p"/runs/#{run.id}"} class="font-mono text-sm text-sky-700 hover:underline">
+        #<%= run.id %>
+      </.link>
+
+      <span class={"rounded-full px-2 py-0.5 text-xs font-medium #{state_class(run.state)}"}><%= run.state %></span>
+
+      <span class="min-w-0 flex-1 truncate text-sm text-slate-700" title={run.source_path}>
+        <%= run.source_path %>
+      </span>
+
+      <span class="text-xs text-slate-500">
+        <%= run.language %> · k <%= run.killed %> / s <%= run.survived %>
+        <span :if={run.invalid > 0}> · inv <%= run.invalid %></span>
+        <span :if={run.error_count > 0}> · err <%= run.error_count %></span>
+      </span>
+
+      <span class="w-14 text-right font-mono text-sm font-semibold text-slate-900"><%= score_badge(run) %></span>
+
+      <button
+        :if={run.state in ~w(queued preparing baselining scanning running)}
+        phx-click="cancel"
+        phx-value-id={run.id}
+        class="rounded border border-amber-300 px-2 py-1 text-xs text-amber-800 hover:bg-amber-50"
+      >
+        cancel
+      </button>
+    </div>
+
+    <div :if={@runs == []} class="px-4 py-6 text-sm text-slate-500">
+      No runs yet. Submit a subject directory above to start.
+    </div>
+  </div>
+</div>
