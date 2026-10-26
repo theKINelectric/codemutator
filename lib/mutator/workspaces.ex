@@ -162,6 +162,10 @@ defmodule Mutator.Workspaces do
       ["-a", "--no-links"] ++
         Enum.flat_map(excludes, &["--exclude", &1]) ++ [src <> "/", dest]
 
+    # rsync creates only the last path component of dest; GNU rsync fails
+    # when its parent is missing (macOS openrsync happens to create it).
+    :ok = File.mkdir_p(Path.dirname(dest))
+
     case System.cmd("rsync", args, stderr_to_stdout: true) do
       {_out, 0} ->
         File.mkdir_p(dest)
