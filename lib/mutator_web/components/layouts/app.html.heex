@@ -1,0 +1,30 @@
+<header class="px-4 sm:px-6 lg:px-8">
+  <div class="flex items-center justify-between border-b border-zinc-100 py-3 text-sm">
+    <div class="flex items-center gap-3">
+      <a
+        href="/runs"
+        class="flex items-center gap-2 text-lg font-black tracking-tight text-zinc-900"
+      >
+        <span class="text-xl">💥🔫</span>
+        <span>code<span class="text-brand">MUTATOR</span></span>
+      </a>
+      <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium leading-5 text-zinc-600">
+        mutation testing as a service
+      </span>
+    </div>
+    <div class="flex items-center gap-4 font-semibold leading-6 text-zinc-900">
+      <a href="/runs" class="hover:text-zinc-700">Runs</a>
+      <a href="/agents" class="hover:text-zinc-700">Agent API</a>
+      <span class="text-xs font-normal text-zinc-400">🛸🕳️ iStellar~iModal</span>
+    </div>
+  </div>
+</header>
+<main class="px-4 py-10 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-5xl">
+    <.flash_group flash={@flash} />
+    {@inner_content}
+  </div>
+</main>
+<footer class="px-4 pb-8 text-center text-xs text-zinc-400 sm:px-6 lg:px-8">
+  💥🔫 codeMUTATOR · developed by 🛸🕳️ iStellar~iModal · score = killed / (killed + survived)
+</footer>

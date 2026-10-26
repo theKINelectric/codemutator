@@ -1,0 +1,12 @@
+/_build/
+/deps/
+erl_crash.dump
+*.db
+*.db-shm
+*.db-wal
+/temporary_subject/
+/test/tmp_*/
+/assets/node_modules/
+/priv/static/assets/
+.DS_Store
+.env

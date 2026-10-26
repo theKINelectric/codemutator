@@ -1,0 +1,122 @@
+<div class="mx-auto max-w-4xl">
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-900">Agent &amp; CLI interaction</h1>
+  <p class="mt-1 text-sm text-zinc-600">
+    codeMUTATOR is built agents-first: a loopback JSON API, a polling CLI, and a
+    machine-readable service card. No auth on localhost — the server binds to 127.0.0.1.
+  </p>
+
+  <h2 class="mt-8 text-lg font-semibold text-zinc-900">One-shot CLI (recommended)</h2>
+  <pre class="mt-2 overflow-x-auto rounded-lg bg-zinc-900 p-4 text-xs leading-relaxed text-zinc-100"><code># submit a project, wait for the terminal state, print score
+codemutator run /abs/path/to/project --scope src/ --limit 20 --wait
+
+# inspect without waiting
+codemutator status 1
+codemutator outcomes 1 killed     # filter: killed|survived|invalid|error
+codemutator cancel 1              # stop new dispatch; in-flight mutants drain
+codemutator info                  # service card (capabilities, states)</code></pre>
+  <p class="mt-2 text-xs text-zinc-500">
+    CLI lives at <code>bin/codemutator</code>
+    in the repo; instance selectable via <code>CODEMUTATOR_URL</code>
+    (default <code>http://localhost:4300</code>).
+  </p>
+
+  <h2 class="mt-8 text-lg font-semibold text-zinc-900">JSON API</h2>
+  <table class="mt-2 min-w-full text-left text-sm">
+    <thead>
+      <tr class="text-xs uppercase tracking-wide text-zinc-500">
+        <th class="py-2 pr-6">Method</th>
+        <th class="py-2 pr-6">Path</th>
+        <th class="py-2">Purpose</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-zinc-100">
+      <tr>
+        <td class="py-2 pr-6 font-mono text-xs">POST</td>
+        <td class="py-2 pr-6 font-mono text-xs">/api/runs</td>
+        <td class="py-2">
+          submit:
+          <code>
+            &#123;"source_path":"/abs/path","scope_filter":"src/","mutant_limit":20,"run_budget_ms":3600000&#125;
+          </code>
+        </td>
+      </tr>
+      <tr>
+        <td class="py-2 pr-6 font-mono text-xs">GET</td>
+        <td class="py-2 pr-6 font-mono text-xs">/api/runs/:id</td>
+        <td class="py-2">status + counts + score (<code>terminal: true</code> when finished)</td>
+      </tr>
+      <tr>
+        <td class="py-2 pr-6 font-mono text-xs">GET</td>
+        <td class="py-2 pr-6 font-mono text-xs">/api/runs/:id/outcomes</td>
+        <td class="py-2">
+          every outcome: file, line, function, mutation, status, reason, log path
+        </td>
+      </tr>
+      <tr>
+        <td class="py-2 pr-6 font-mono text-xs">POST</td>
+        <td class="py-2 pr-6 font-mono text-xs">/api/runs/:id/cancel</td>
+        <td class="py-2">request cancellation (drains in-flight mutants)</td>
+      </tr>
+      <tr>
+        <td class="py-2 pr-6 font-mono text-xs">GET</td>
+        <td class="py-2 pr-6 font-mono text-xs">/agents.json</td>
+        <td class="py-2">machine-readable service card</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <pre class="mt-3 overflow-x-auto rounded-lg bg-zinc-900 p-4 text-xs leading-relaxed text-zinc-100"><code># curl recipe an agent can paste verbatim
+curl -s -X POST http://localhost:4300/api/runs \
+  -H 'content-type: application/json' \
+  -d '&#123;"source_path":"/abs/path/to/project","scope_filter":"src/","mutant_limit":20&#125;'
+# poll until "terminal": true
+curl -s http://localhost:4300/api/runs/1
+# full evidence
+curl -s http://localhost:4300/api/runs/1/outcomes</code></pre>
+
+  <h2 class="mt-8 text-lg font-semibold text-zinc-900">Reading results</h2>
+  <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-700">
+    <li>
+      <strong>score = killed / (killed + survived)</strong>
+      — <code>invalid</code>
+      (compiler-rejected mutants), <code>error</code>
+      (infrastructure), <code>cancelled/interrupted</code>
+      are excluded but counted.
+    </li>
+    <li>
+      <code>survived</code>
+      on code the test suite never exercises is the expected verdict (e.g. CLI <code>main</code>s); survivors in tested functions are the actionable signal.
+    </li>
+    <li>
+      States: queued → preparing → baselining → scanning → running → completed | failed | cancelled | interrupted | budget_exhausted. One active run; others queue.
+    </li>
+    <li>
+      Every mutant log (argv, cwd, env provenance) is retained under the run's
+      <code>log_path</code>
+      fields.
+    </li>
+  </ul>
+
+  <h2 class="mt-8 text-lg font-semibold text-zinc-900">Guarantees</h2>
+  <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-700">
+    <li>
+      The submitted directory is <strong>never written</strong>
+      — all work happens on copies under <code>temporary_subject/&lt;run_id&gt;/</code>.
+    </li>
+    <li>
+      Deterministic site selection: round-robin across files (byte order within a file) — the same submission yields the same sample.
+    </li>
+    <li>
+      Mutation budget is a dispatch deadline; in-flight mutants always drain to a terminal outcome, never a hang.
+    </li>
+  </ul>
+
+  <h2 class="mt-8 text-lg font-semibold text-zinc-900">MCP</h2>
+  <p class="mt-2 text-sm text-zinc-700">
+    An MCP server ships in <code>bin/codemutator_mcp.py</code>
+    exposing <code>submit_run</code>, <code>get_run</code>, <code>list_outcomes</code>,
+    <code>cancel_run</code>
+    —
+    see the repo README for the client config snippet.
+  </p>
+</div>
