@@ -15,6 +15,7 @@ defmodule MutatorWeb.API.AgentsController do
       developer: "iStellar~iModal",
       languages: %{
         zig: "qualified (zig build test, mise-pinned)",
+        rust: "qualified (cargo test; conservative lexical operators, excludes #[test] and macro bodies)",
         elixir: "adapter ready (MIX_ENV=test mix test)",
         swift: "adapter ready (swift test, SwiftPM only)",
         kotlin: "detection only — reports toolchain_unavailable"

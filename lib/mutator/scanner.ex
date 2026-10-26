@@ -37,13 +37,19 @@ defmodule Mutator.Scanner do
     "volatile", "allowzero", "linksection", "callconv", "unreachable",
     "break", "continue", "errdefer", "usingnamespace", "false", "true",
     "struct", "union", "enum", "opaque", "error", "packed", "extern",
-    "when", "guard", "let", "val", "init", "deinit"
+    "when", "guard", "let", "val", "init", "deinit",
+    # rust declaration/expression keywords; operand-like idents (`self`,
+    # `Self`, `super`, `crate`, `await`, `Some`/`None`/`Ok`/`Err`) stay out
+    "mut", "ref", "match", "loop", "unsafe", "async", "dyn", "box", "impl",
+    "mod", "use", "type", "trait", "move", "macro_rules", "macro", "static",
+    "yield", "raw", "default"
   ]
 
   @prefix_ops [
     "(", "[", "{", ",", "=", ";", "!", "&&", "||", "==", "!=", "<", "<=",
     ">", ">=", "+", "-", "*", "/", "->", "=>", "::", "..", "..<", "?:",
-    "!!", "|>", "else", "when", "catch", "return", "not", "and", "or"
+    "!!", "|>", "|", "&", ":", "else", "when", "catch", "return", "not",
+    "and", "or"
   ]
 
   defmodule Site do
@@ -163,10 +169,37 @@ defmodule Mutator.Scanner do
     }
   end
 
+  def rust_profile do
+    %Profile{
+      language: :rust,
+      block_style: :brace,
+      fn_keywords: ["fn"],
+      # `#[test]` lexes as ident `test` at paren depth 0 (the `(` under it is
+      # only `cfg(..)` args); `mod tests`/`mod test` name the conventional
+      # test module. A test pending then survives the `fn` decl it annotates.
+      test_keywords: ["test", "tests"],
+      test_name_prefixes: ["test"],
+      operators: %{
+        "==" => "!=", "!=" => "==",
+        "+" => "-", "-" => "+", "*" => "/", "/" => "*",
+        "&&" => "||", "||" => "&&"
+      },
+      delete_unary: ["!", "-"],
+      unary_next_skip: [],
+      bools: %{"true" => "false", "false" => "true"},
+      infix_idents: %{},
+      # `x < y` with an ident LHS stays unmutated — `<` opens generic argument
+      # lists (`Vec<T>`), and only `)`/`]`/literal/`?` left-hand sides are a
+      # definite expression. Same policy as Swift/Kotlin.
+      comparison_lhs_ops_only: %{"<" => "<=", "<=" => "<", ">" => ">=", ">=" => ">"}
+    }
+  end
+
   def profile(:zig), do: zig_profile()
   def profile(:elixir), do: elixir_profile()
   def profile(:swift), do: swift_profile()
   def profile(:kotlin), do: kotlin_profile()
+  def profile(:rust), do: rust_profile()
 
   # -- scanning --------------------------------------------------------------
 
@@ -199,6 +232,7 @@ defmodule Mutator.Scanner do
   defp lexer_config(:elixir), do: Lexer.elixir_config()
   defp lexer_config(:swift), do: Lexer.swift_config()
   defp lexer_config(:kotlin), do: Lexer.kotlin_config()
+  defp lexer_config(:rust), do: Lexer.rust_config()
 
   @doc "SHA-256 of file content, used to key sites."
   def file_hash(source), do: :crypto.hash(:sha256, source) |> Base.encode16(case: :lower)
@@ -268,8 +302,15 @@ defmodule Mutator.Scanner do
                     {state, closed}
 
                   name ->
+                    # A pending `:test` (Rust `#[test]`, or a `test`-keyword
+                    # attribute) annotates this fn decl — it wins over the
+                    # function kind, same as a `test`-prefixed name.
                     decl =
-                      if test_named?(name, profile), do: {:test, name}, else: {:function, name}
+                      if match?({:test, _}, state.pending) or test_named?(name, profile) do
+                        {:test, name}
+                      else
+                        {:function, name}
+                      end
 
                     {%{state | pending: decl}, closed}
                 end

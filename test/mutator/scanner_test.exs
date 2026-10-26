@@ -384,6 +384,182 @@ defmodule Mutator.ScannerTest do
     end
   end
 
+  describe "rust operators" do
+    test "arithmetic and logical on plain operands" do
+      src = """
+      fn calc(a: i32, b: i32) -> i32 {
+          let s = a + b;
+          let d = a - b;
+          let p = a * b;
+          let q = a / b;
+          let both = a > 0 && b > 0;
+          let either = a > 0 || b > 0;
+          s
+      }
+      """
+
+      sites = rscan(src)
+      assert {{"arith", "+", "-"}, 1} = count(sites, {"arith", "+", "-"})
+      assert {{"arith", "-", "+"}, 1} = count(sites, {"arith", "-", "+"})
+      assert {{"arith", "*", "/"}, 1} = count(sites, {"arith", "*", "/"})
+      assert {{"arith", "/", "*"}, 1} = count(sites, {"arith", "/", "*"})
+      assert {{"logical", "&&", "||"}, 1} = count(sites, {"logical", "&&", "||"})
+      assert {{"logical", "||", "&&"}, 1} = count(sites, {"logical", "||", "&&"})
+    end
+
+    test "equality, unary delete, bools, and const01" do
+      src = """
+      fn check(a: i32, b: i32) -> i32 {
+          if a == b { return 1; }
+          if a != b { return 0; }
+          let flag = true;
+          let other = false;
+          let x = -a;
+          if !flag { return 0; }
+          0
+      }
+      """
+
+      sites = rscan(src)
+      assert {{"equality", "==", "!="}, 1} = count(sites, {"equality", "==", "!="})
+      assert {{"equality", "!=", "=="}, 1} = count(sites, {"equality", "!=", "=="})
+      assert {{"unary_del", "-", ""}, 1} = count(sites, {"unary_del", "-", ""})
+      assert {{"unary_del", "!", ""}, 1} = count(sites, {"unary_del", "!", ""})
+      assert {{"bool", "true", "false"}, 1} = count(sites, {"bool", "true", "false"})
+      assert {{"bool", "false", "true"}, 1} = count(sites, {"bool", "false", "true"})
+      assert {{"const01", "1", "0"}, 1} = count(sites, {"const01", "1", "0"})
+      assert {{"const01", "0", "1"}, 3} = count(sites, {"const01", "0", "1"})
+    end
+
+    test "comparisons only with a definite expression LHS" do
+      src = """
+      fn f(v: &[i32], i: usize) -> bool {
+          if v.len() > 2 { return true; }
+          if v[i] < 5 { return true; }
+          if 3 <= v.len() { return true; }
+          false
+      }
+
+      fn g(x: i32, y: i32) -> bool {
+          if x < y { return true; }
+          false
+      }
+      """
+
+      sites = rscan(src)
+      # `)` / `]` / number LHS: all three mutated
+      assert {{"comparison", ">", ">="}, 1} = count(sites, {"comparison", ">", ">="})
+      assert {{"comparison", "<", "<="}, 1} = count(sites, {"comparison", "<", "<="})
+      assert {{"comparison", "<=", "<"}, 1} = count(sites, {"comparison", "<=", "<"})
+      # ident LHS (`x < y`): never mutated — `<` could open a generic list
+      refute Enum.any?(sites, fn s -> s.function == "g" and s.original == "<" end)
+    end
+
+    test "generics, pointers, derefs, macros, and closures are left alone" do
+      src = """
+      fn f(v: Vec<i32>, p: *const u8, r: &i32) -> i32 {
+          let mut x = 0;
+          println!("{}", x);
+          let y = *r;
+          let g = |n: i32| n + 1;
+          let z = v.iter().map(|n| *n).unwrap_or_else(|| 0);
+          x
+      }
+      """
+
+      sites = rscan(src)
+      # `Vec<i32>` generic brackets never mutate
+      refute Enum.any?(sites, &(&1.original in ["<", ">"]))
+      # `*const` pointer `*` not mutated; `*r` deref `*` not mutated
+      refute Enum.any?(sites, &(&1.original == "*"))
+      # `println!` `!` not deleted (not in prefix position)
+      refute Enum.any?(sites, &(&1.original == "!"))
+      # `*n` deref inside the closure arg: `|`...`| n + 1` — the `+` mutates
+      assert {{"arith", "+", "-"}, 1} = count(sites, {"arith", "+", "-"})
+      # `|| 0` is an empty-params closure, not boolean-or — `||` not mutated
+      refute Enum.any?(sites, &(&1.original == "||"))
+      # `|` closure pipes are not operands — `|n| n + 1` `+` still mutates
+      assert {{"const01", "1", "0"}, 1} = count(sites, {"const01", "1", "0"})
+      # `0` literals in `let mut x = 0` and the `|| 0` closure body
+      assert {{"const01", "0", "1"}, 2} = count(sites, {"const01", "0", "1"})
+    end
+
+    test "test functions and test modules are excluded" do
+      src = """
+      pub fn add(a: i32, b: i32) -> i32 { a + b }
+
+      #[test]
+      fn test_add() { assert_eq!(add(1, 2), 3); }
+
+      #[cfg(test)]
+      mod tests {
+          use super::*;
+
+          #[test]
+          fn check() { assert!(add(1, 1) == 2); }
+
+          fn helper() { let x = 1 + 1; }
+      }
+
+      fn test_named_helper() { let y = 2 + 2; }
+      """
+
+      sites = rscan(src)
+      assert Enum.all?(sites, &(&1.function == "add"))
+      assert {{"arith", "+", "-"}, 1} = count(sites, {"arith", "+", "-"})
+    end
+
+    test "strings, raw strings, chars, lifetimes, and comments are never mutated" do
+      src = """
+      fn f<'a>(s: &'a str, c: char) -> bool {
+          let _msg = "a + b == c";
+          let _raw = r#"x < y"#;
+          let _deep = r##"p"q"##;
+          let _ch = '+';
+          // if a == b { return true; }
+          /* let x = a && b; */
+          s.len() == 0
+      }
+
+      fn labelled(x: i32) -> i32 {
+          'outer: loop {
+              if x > 0 { break 'outer x; }
+          }
+      }
+      """
+
+      sites = rscan(src)
+      # lifetimes `'a`/`'outer` stay code; inside literals/comments nothing
+      # mutates. Real sites: `==` in `s.len() == 0` plus the `0` literals in
+      # `s.len() == 0` and `x > 0` (the `>` has an ident LHS → no site).
+      assert {{"equality", "==", "!="}, 1} = count(sites, {"equality", "==", "!="})
+      assert {{"const01", "0", "1"}, 2} = count(sites, {"const01", "0", "1"})
+      assert length(sites) == 3
+      refute Enum.any?(sites, &(&1.line in [2, 3, 4, 5, 6, 7]))
+    end
+
+    test "compounds: += splits to + mutation, match arms host real sites" do
+      src = """
+      fn f(mut a: i32, n: i32) -> i32 {
+          a += n;
+          match n {
+              0 => a + 1,
+              _ => a - 1,
+          }
+      }
+      """
+
+      sites = rscan(src)
+      # `+=` lexes as `+`,`=` — the `+` mutates to `-` giving `a -= n`
+      assert {{"arith", "+", "-"}, 2} = count(sites, {"arith", "+", "-"})
+      assert {{"arith", "-", "+"}, 1} = count(sites, {"arith", "-", "+"})
+      assert {{"const01", "0", "1"}, 1} = count(sites, {"const01", "0", "1"})
+      assert {{"const01", "1", "0"}, 2} = count(sites, {"const01", "1", "0"})
+    end
+  end
+
+  defp rscan(src), do: Scanner.scan(:rust, "src/lib.rs", src)
+
   defp count(sites, key) do
     n = Enum.count(sites, fn s -> {s.operator, s.original, s.replacement} == key end)
     {key, n}

@@ -10,10 +10,10 @@ to a private copy, runs the subject's own tests, and reports killed/survived
 outcomes with per-function scores.
 
 Built with **Phoenix 1.7 + FlowExtra (railway pipelines on GenStage) +
-SQLite** (`ecto_sqlite3`). Qualified for **Zig 0.16**; **Elixir** and **Swift**
-adapters implement the same boundary (qualification pending); **Kotlin** is
-detected and reported as `toolchain_unavailable` until a JDK/Gradle profile
-exists on this host.
+SQLite** (`ecto_sqlite3`). Qualified for **Zig 0.16** and **Rust** (cargo
+1.98, e2e-verified); **Elixir** and **Swift** adapters implement the same
+boundary (qualification pending); **Kotlin** is detected and reported as
+`toolchain_unavailable` until a JDK/Gradle profile exists on this host.
 
     Score = killed / (killed + survived)
 
@@ -87,7 +87,7 @@ inside `temporary_subject/<run_id>/`:
 | `Mutator.Pipelines.ExecuteMutant` | FlowExtra railway: `execute [count: 2] → record [count: 1]` |
 | `Mutator.Execution.ProcessRunner` | argv subprocesses, own process groups, TERM→KILL deadlines, streamed logs |
 | `Mutator.Workspaces` | snapshots, lanes, manifests (original-untouched proof) |
-| `Mutator.Languages.*` | adapter behaviour + Zig/Elixir/Swift/Kotlin + detector |
+| `Mutator.Languages.*` | adapter behaviour + Zig/Elixir/Swift/Kotlin/Rust + detector |
 | `Mutator.Scanner` (+ `.Lexer`) | token scanner: sites + function spans, per-language operator tables |
 
 ## Two host-specific facts worth knowing
@@ -111,6 +111,7 @@ inside `temporary_subject/<run_id>/`:
 | Elixir | the above plus `*`↔`/`, `&&`↔`||`, delete `not`. `do:` one-liners skipped (documented subset). |
 | Swift | Java-style set; `<`/`>` only with a definite expression LHS (generics). `x!` never touched. |
 | Kotlin | Java-style set plus `===`↔`!==`; `!in`/`!is`/`!!` never touched. Detection-only until a toolchain exists. |
+| Rust | `true`↔`false`; `==`↔`!=`; binary `+`↔`-`, `*`↔`/`; `&&`↔`||`; delete prefix `!` and unary `-`; `0`↔`1`. `<`/`>` only with a definite expression LHS (generics). `#[test]`/`mod tests` bodies, `macro_rules!`, `*const`/deref `*`, closure `||`, lifetimes, and raw strings never touched. |
 
 Skipped everywhere: strings, comments, test bodies, top-level initializers,
 type syntax. Uncertain constructs are never mutated.
@@ -119,7 +120,7 @@ type syntax. Uncertain constructs are never mutated.
 
 ```bash
 mix test                                            # unit + gates
-mix test test/mutator/e2e_run_test.exs --include e2e  # real zig fixture through the engine
+mix test test/mutator/e2e_run_test.exs --include e2e  # real zig + rust fixtures through the engine
 ```
 
 Milestones and acceptance gates: [MVP_PLAN.md](MVP_PLAN.md).

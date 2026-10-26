@@ -36,7 +36,12 @@ defmodule Mutator.Scanner.Lexer do
       multi_ops: [],
       sigils: false,
       atom_prefix: false,
-      zig_multiline_strings: false
+      zig_multiline_strings: false,
+      # Rust `'a` lifetimes/labels share a quote with `'x'` char literals —
+      # an identifier run that does not end at `'` is a lifetime, not a string.
+      rust_lifetimes: false,
+      # Rust `r#".."#` raw strings close on `"` plus the opening `#` count.
+      raw_hash_strings: false
     ]
   end
 
@@ -108,6 +113,23 @@ defmodule Mutator.Scanner.Lexer do
     }
   end
 
+  def rust_config do
+    %Config{
+      language: :rust,
+      line_comments: ["//"],
+      block_comments: [{"/*", "*/"}],
+      strings: [{"\"", "\"", "\\"}, {"'", "'", "\\"}],
+      multi_ops: [
+        "<<=", ">>=", "..=",
+        "==", "!=", "<=", ">=", "&&", "||", "<<", ">>", "->", "=>", "::", "..",
+        "+", "-", "*", "/", "%", "=", "<", ">", "!", "&", "|", "^", "~",
+        "?", ".", ":", ";", ",", "(", ")", "[", "]", "{", "}", "@", "#", "$"
+      ],
+      rust_lifetimes: true,
+      raw_hash_strings: true
+    }
+  end
+
   # -- API -------------------------------------------------------------------
 
   @doc """
@@ -162,6 +184,12 @@ defmodule Mutator.Scanner.Lexer do
       block_comment?(binary, config) ->
         {:skip, :comment, after_block_comment(binary, config)}
 
+      raw_hash_string?(binary, config) ->
+        {:skip, :raw_string, after_raw_hash(binary, config)}
+
+      lifetime_quote?(binary, config) ->
+        {:token, :op, "'", drop_prefix(binary, 1)}
+
       raw_string?(binary, config) ->
         {:skip, :raw_string, after_raw_string(binary, config)}
 
@@ -201,6 +229,61 @@ defmodule Mutator.Scanner.Lexer do
 
   defp raw_string?(binary, %Config{raw_strings: pairs}) do
     Enum.any?(pairs, fn {open, _} -> String.starts_with?(binary, open) end)
+  end
+
+  # Rust lifetimes: `'a`/`'static`/`'out:` keep their quote as code; `'x'`,
+  # `'\n'`, `'}'` are char literals and skip. An identifier run that ends at a
+  # closing `'` is a char; anything else is a lifetime.
+  defp lifetime_quote?(<<"'", rest::binary>>, %Config{rust_lifetimes: true}) do
+    case rest do
+      <<c, after_c::binary>>
+      when c in ?a..?z or c in ?A..?Z or c == ?_ or c > 127 ->
+        {_, after_run} = take_while(after_c, &lifetime_char?/1)
+        not String.starts_with?(after_run, "'")
+
+      _ ->
+        false
+    end
+  end
+
+  defp lifetime_quote?(_, _), do: false
+
+  defp lifetime_char?(c), do: c in ?a..?z or c in ?A..?Z or c in ?0..?9 or c == ?_
+
+  # Rust raw strings: `r".."`, `r#".."#`, `r##".."##` (and `br..` byte-raw).
+  # The close is `"` plus exactly the opening `#` count — extra `#`s are code.
+  defp raw_hash_string?(binary, %Config{raw_hash_strings: true}),
+    do: raw_hash_prefix(binary) != false
+
+  defp raw_hash_string?(_, _), do: false
+
+  defp raw_hash_prefix(<<"r", rest::binary>>), do: raw_hash_hashes(rest, 0, 1)
+  defp raw_hash_prefix(<<"b", "r", rest::binary>>), do: raw_hash_hashes(rest, 0, 2)
+  defp raw_hash_prefix(_), do: false
+
+  defp raw_hash_hashes(<<"#", rest::binary>>, n, p), do: raw_hash_hashes(rest, n + 1, p + 1)
+  defp raw_hash_hashes(<<"\"", _::binary>>, n, p), do: {p + 1, n}
+  defp raw_hash_hashes(_, _, _), do: false
+
+  defp after_raw_hash(binary, _config) do
+    {open_len, hashes} = raw_hash_prefix(binary)
+    scan_raw_close(drop_prefix(binary, open_len), hashes)
+  end
+
+  defp scan_raw_close(binary, hashes) do
+    case :binary.match(binary, "\"") do
+      :nomatch ->
+        ""
+
+      {pos, 1} ->
+        rest = drop_prefix(binary, pos + 1)
+
+        if String.starts_with?(rest, String.duplicate("#", hashes)) do
+          drop_prefix(rest, hashes)
+        else
+          scan_raw_close(rest, hashes)
+        end
+    end
   end
 
   defp after_raw_string(binary, %Config{raw_strings: [{open, close} | _]}) do

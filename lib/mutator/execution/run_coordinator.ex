@@ -266,9 +266,7 @@ defmodule Mutator.Execution.RunCoordinator do
   end
 
   defp mark_remaining(run_id, status, reason) do
-    run = Runs.get_run(run_id)
-
-    run
+    run_id
     |> Runs.pending_sites()
     |> Enum.each(fn site ->
       Runs.record_outcome(run_id, site.id, %{status: status, reason: reason, phase: "dispatch"})

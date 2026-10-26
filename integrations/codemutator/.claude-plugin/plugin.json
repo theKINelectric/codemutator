@@ -1,0 +1,6 @@
+{
+  "name": "codemutator",
+  "version": "0.1.0",
+  "author": { "name": "codeMUTATOR contributors" },
+  "description": "Bounded async mutation testing: explicit scoped submits via /codemutator-run, boundary polling, stale-result refusal, cancel with cleanup verification. Native Mods form, per licorice's being-memory precedent."
+}

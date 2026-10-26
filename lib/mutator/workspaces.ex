@@ -173,10 +173,15 @@ defmodule Mutator.Workspaces do
   end
 
   # Root files every build needs regardless of scope; scoped directories are
-  # copied whole beneath them.
+  # copied whole beneath them. Rust: Cargo.toml/Cargo.lock are the manifest +
+  # lockfile (detection and `cargo test` both need them); rust-toolchain pins
+  # the toolchain; build.rs is the build script (copied for the build, still
+  # never mutated — Detector.build_script?/2).
   @root_files ~w(build.zig build.zig.zon mix.exs mix.lock Package.swift
                  Package.resolved settings.gradle settings.gradle.kts
-                 build.gradle build.gradle.kts gradle.properties .mise.toml)
+                 build.gradle build.gradle.kts gradle.properties .mise.toml
+                 Cargo.toml Cargo.lock rust-toolchain.toml rust-toolchain
+                 build.rs)
 
   defp copy_scoped(src, dest, excludes, nil),
     do: copy_tree(src, dest, excludes)
@@ -195,7 +200,7 @@ defmodule Mutator.Workspaces do
       # config, vendored deps, priv (migrations/static), assets. Missing any
       # of these turns `mix test` into an interactive Hex prompt that hangs
       # to the deadline (observed in the self-hosting dogfood).
-      extra_dirs = ~w(test tests spec config deps priv assets) ++
+      extra_dirs = ~w(test tests spec config deps priv assets .cargo) ++
                      ~w(gradle gradlew build.gradle settings.gradle Packages Package.swift)
 
       Enum.each(extra_dirs, fn d ->

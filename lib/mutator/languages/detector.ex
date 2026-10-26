@@ -6,7 +6,7 @@ defmodule Mutator.Languages.Detector do
   can *run* it here.
   """
 
-  @adapters [Mutator.Languages.Zig, Mutator.Languages.ElixirLang, Mutator.Languages.Swift, Mutator.Languages.Kotlin]
+  @adapters [Mutator.Languages.Zig, Mutator.Languages.ElixirLang, Mutator.Languages.Swift, Mutator.Languages.Kotlin, Mutator.Languages.Rust]
 
   def adapters, do: @adapters
 
@@ -55,8 +55,10 @@ defmodule Mutator.Languages.Detector do
   end
 
   # Build scripts are project configuration, not subject code: mutating
-  # build.zig perturbs every mutant's compile instead of testing behavior.
+  # build.zig/build.rs perturbs every mutant's compile instead of testing
+  # behavior.
   defp build_script?(Mutator.Languages.Zig, rel), do: rel in ["build.zig"]
+  defp build_script?(Mutator.Languages.Rust, rel), do: rel in ["build.rs"]
   defp build_script?(_adapter, _rel), do: false
 
   # Vendored/generated/build directories are copied but never mutated.
