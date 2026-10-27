@@ -15,7 +15,6 @@ defmodule Mutator.Execution.Scheduler do
   alias Mutator.Execution.RunCoordinator
   alias Mutator.Runs
 
-
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -39,10 +38,11 @@ defmodule Mutator.Execution.Scheduler do
         {:noreply, state}
 
       run ->
-        task = Task.Supervisor.async_nolink(Mutator.TaskSup, fn ->
-          Logger.info("scheduler starting run #{run.id}")
-          RunCoordinator.run(run.id)
-        end)
+        task =
+          Task.Supervisor.async_nolink(Mutator.TaskSup, fn ->
+            Logger.info("scheduler starting run #{run.id}")
+            RunCoordinator.run(run.id)
+          end)
 
         {:noreply, %{state | task: task}}
     end
@@ -79,5 +79,4 @@ defmodule Mutator.Execution.Scheduler do
     from(r in Runs.Run, where: r.state in ~w(preparing baselining scanning running))
     |> Mutator.Repo.update_all(set: [state: "interrupted"])
   end
-
 end

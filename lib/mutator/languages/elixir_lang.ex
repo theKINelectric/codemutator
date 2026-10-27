@@ -51,11 +51,14 @@ defmodule Mutator.Languages.ElixirLang do
 
   def classify({:ok, %{exit_code: _, tail: tail}}) do
     cond do
-      tail =~ "error:" and (tail =~ ".ex:" or tail =~ "Compilation error") -> :invalid
+      tail =~ "error:" and (tail =~ ".ex:" or tail =~ "Compilation error") ->
+        :invalid
+
       tail =~ "test failures" or tail =~ "Assertion with" or tail =~ "assert" ->
         {:killed, :assertion}
 
-      true -> :unclassified
+      true ->
+        :unclassified
     end
   end
 

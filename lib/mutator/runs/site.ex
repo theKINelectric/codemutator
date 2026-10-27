@@ -49,7 +49,19 @@ defmodule Mutator.Runs.Site do
       :replacement,
       :scheduling_state
     ])
-    |> validate_required([:run_id, :site_key, :file, :function, :line, :byte_start, :byte_end, :file_hash, :operator, :original, :replacement])
+    |> validate_required([
+      :run_id,
+      :site_key,
+      :file,
+      :function,
+      :line,
+      :byte_start,
+      :byte_end,
+      :file_hash,
+      :operator,
+      :original,
+      :replacement
+    ])
     |> validate_inclusion(:scheduling_state, @scheduling_states)
     |> unique_constraint(:site_key, name: :sites_run_id_site_key_index)
   end

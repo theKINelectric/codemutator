@@ -31,15 +31,20 @@ defmodule Mutator.E2ERunTest do
 
     # give the scheduler the whole run's budget; poll for a terminal state
     terminal = wait_terminal(run_id, 15 * 60_000)
-    assert terminal in ~w(completed), "run ended in #{terminal}: #{inspect(Runs.get_run(run_id).failure_reason)}"
+
+    assert terminal in ~w(completed),
+           "run ended in #{terminal}: #{inspect(Runs.get_run(run_id).failure_reason)}"
 
     run = Runs.get_run(run_id)
     outcomes = Runs.list_outcomes(run_id)
     sites = Runs.list_sites(run_id)
 
-    File.write!("/tmp/e2e_outcomes.txt", Enum.map_join(outcomes, "\n", fn o ->
-      "#{o.site.function}:#{o.site.line} #{o.site.original}->#{o.site.replacement} = #{o.status} (#{o.reason}) exit=#{o.exit_code} #{o.elapsed_ms}ms"
-    end))
+    File.write!(
+      "/tmp/e2e_outcomes.txt",
+      Enum.map_join(outcomes, "\n", fn o ->
+        "#{o.site.function}:#{o.site.line} #{o.site.original}->#{o.site.replacement} = #{o.status} (#{o.reason}) exit=#{o.exit_code} #{o.elapsed_ms}ms"
+      end)
+    )
 
     assert length(sites) == 8, "mutant limit respected"
     assert length(outcomes) == 8, "one terminal row per selected site"
@@ -47,7 +52,6 @@ defmodule Mutator.E2ERunTest do
     assert run.killed >= 1, "the add(+)/sign(==) mutations must be killed"
     assert run.survived >= 1, "the clamp boundary mutations must survive"
     assert run.invalid >= 0
-
 
     score = Runs.score(run)
     assert is_float(score) and score > 0.0 and score < 1.0
@@ -82,21 +86,28 @@ defmodule Mutator.E2ERunTest do
     run_id = run.id
 
     terminal = wait_terminal(run_id, 15 * 60_000)
-    assert terminal in ~w(completed), "run ended in #{terminal}: #{inspect(Runs.get_run(run_id).failure_reason)}"
+
+    assert terminal in ~w(completed),
+           "run ended in #{terminal}: #{inspect(Runs.get_run(run_id).failure_reason)}"
 
     run = Runs.get_run(run_id)
     outcomes = Runs.list_outcomes(run_id)
     sites = Runs.list_sites(run_id)
 
-    File.write!("/tmp/e2e_rust_outcomes.txt", Enum.map_join(outcomes, "\n", fn o ->
-      "#{o.site.function}:#{o.site.line} #{o.site.original}->#{o.site.replacement} = #{o.status} (#{o.reason}) exit=#{o.exit_code} #{o.elapsed_ms}ms"
-    end))
+    File.write!(
+      "/tmp/e2e_rust_outcomes.txt",
+      Enum.map_join(outcomes, "\n", fn o ->
+        "#{o.site.function}:#{o.site.line} #{o.site.original}->#{o.site.replacement} = #{o.status} (#{o.reason}) exit=#{o.exit_code} #{o.elapsed_ms}ms"
+      end)
+    )
 
     assert length(sites) == 9, "expected 9 sites in the fixture, got #{length(sites)}"
     assert length(outcomes) == 9
     assert run.terminal_sites == 9
     assert run.killed >= 2, "the add(+), clamp(&&), and sign(-1/literal) mutations must be killed"
-    assert run.survived >= 1, "the normalized()<lo boundary and equivalent literal mutations must survive"
+
+    assert run.survived >= 1,
+           "the normalized()<lo boundary and equivalent literal mutations must survive"
 
     assert Enum.all?(outcomes, &(&1.site.file in ["src/lib.rs"]))
 
@@ -129,6 +140,7 @@ defmodule Mutator.E2ERunTest do
 
     run_id = run.id
     terminal = wait_terminal(run_id, 15 * 60_000)
+
     assert terminal == "completed",
            "scoped run ended in #{terminal}: #{inspect(Runs.get_run(run_id).failure_reason)}"
 
@@ -168,12 +180,18 @@ defmodule Mutator.E2ERunTest do
     {:ok, _} = Runs.cancel_run(run_id)
 
     terminal = wait_terminal(run_id, 15 * 60_000)
+
     assert terminal == "cancelled",
            "cancelled run ended in #{terminal}: #{inspect(Runs.get_run(run_id).failure_reason)}"
 
     run = Runs.get_run(run_id)
     assert is_nil(run.failure_reason)
-    assert Enum.all?(Runs.list_outcomes(run_id), &(&1.status in ["killed", "survived", "invalid", "error", "cancelled"]))
+
+    assert Enum.all?(
+             Runs.list_outcomes(run_id),
+             &(&1.status in ["killed", "survived", "invalid", "error", "cancelled"])
+           )
+
     assert Workspaces.same_manifest?(before, Workspaces.manifest(@fixture_rust))
     assert wait_cleaned(run_id), "workspace dir still present after cancelled terminal state"
   end
@@ -187,8 +205,12 @@ defmodule Mutator.E2ERunTest do
     state = Runs.get_run(run_id).state
 
     cond do
-      state == target -> true
-      System.monotonic_time(:millisecond) > deadline -> false
+      state == target ->
+        true
+
+      System.monotonic_time(:millisecond) > deadline ->
+        false
+
       true ->
         Process.sleep(500)
         do_wait_state(run_id, target, deadline)
@@ -222,8 +244,12 @@ defmodule Mutator.E2ERunTest do
 
   defp do_wait_cleaned(dir, deadline) do
     cond do
-      not File.exists?(dir) -> true
-      System.monotonic_time(:millisecond) > deadline -> false
+      not File.exists?(dir) ->
+        true
+
+      System.monotonic_time(:millisecond) > deadline ->
+        false
+
       true ->
         Process.sleep(250)
         do_wait_cleaned(dir, deadline)

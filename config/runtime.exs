@@ -41,7 +41,8 @@ if config_env() == :prod do
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
 
   config :mutator,
-    workspace_root: System.get_env("MUTATOR_WORKSPACE_ROOT") || Path.join(data_dir, "temporary_subject")
+    workspace_root:
+      System.get_env("MUTATOR_WORKSPACE_ROOT") || Path.join(data_dir, "temporary_subject")
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

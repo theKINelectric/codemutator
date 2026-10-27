@@ -116,7 +116,8 @@ defmodule Mutator.M2SafeExecutionTest do
       assert File.exists?(Path.join(worker.project, "src/main.zig"))
       assert File.dir?(worker.zig_local_cache)
       # physical copy, not a link back to the snapshot
-      assert {:ok, %File.Stat{type: :regular}} = File.lstat(Path.join(worker.project, "src/main.zig"))
+      assert {:ok, %File.Stat{type: :regular}} =
+               File.lstat(Path.join(worker.project, "src/main.zig"))
 
       # cleanup leaves nothing behind
       :ok = Workspaces.cleanup_worker(ws, "site1")
@@ -133,8 +134,13 @@ defmodule Mutator.M2SafeExecutionTest do
       on_exit(fn -> Application.delete_env(:mutator, :workspace_root) end)
 
       File.mkdir_p!(Path.join([@tmp, "ws2", "inner"]))
-      assert {:error, :source_inside_workspace} = Workspaces.prepare("x", Path.join([@tmp, "ws2", "inner"]))
-      assert {:error, :source_contains_service} = Workspaces.prepare("x", Path.expand("../..", __DIR__))
+
+      assert {:error, :source_inside_workspace} =
+               Workspaces.prepare("x", Path.join([@tmp, "ws2", "inner"]))
+
+      assert {:error, :source_contains_service} =
+               Workspaces.prepare("x", Path.expand("../..", __DIR__))
+
       assert {:error, :not_a_directory} = Workspaces.prepare("x", Path.join(@tmp, "nope"))
     end
   end

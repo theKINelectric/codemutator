@@ -39,7 +39,12 @@ defmodule Mutator.LanguagesTest do
       File.mkdir_p!(Path.join(root, "src"))
       File.mkdir_p!(Path.join(root, "tests"))
       File.mkdir_p!(Path.join(root, "target/debug"))
-      File.write!(Path.join(root, "Cargo.toml"), "[package]\nname=\"x\"\nversion=\"0.1.0\"\nedition=\"2021\"\n")
+
+      File.write!(
+        Path.join(root, "Cargo.toml"),
+        "[package]\nname=\"x\"\nversion=\"0.1.0\"\nedition=\"2021\"\n"
+      )
+
       File.write!(Path.join(root, "src/lib.rs"), "fn f() {}")
       File.write!(Path.join(root, "src/extra.rs"), "fn g() {}")
       File.write!(Path.join(root, "build.rs"), "fn main() {}")
@@ -65,13 +70,21 @@ defmodule Mutator.LanguagesTest do
     test "pass tail survives, failed tests kill, compile errors are invalid" do
       assert Rust.classify({:ok, %{exit_code: 0, tail: "test result: ok. 3 passed"}}) == :survived
 
-      assert Rust.classify({:ok, %{exit_code: 101, tail: "test result: FAILED. 2 passed; 1 failed"}}) ==
+      assert Rust.classify(
+               {:ok, %{exit_code: 101, tail: "test result: FAILED. 2 passed; 1 failed"}}
+             ) ==
                {:killed, :assertion}
 
       assert Rust.classify({:ok, %{exit_code: 101, tail: "error: test failed, to rerun pass"}}) ==
                {:killed, :runtime_crash}
 
-      assert Rust.classify({:ok, %{exit_code: 101, tail: "error[E0308]: mismatched types\nerror: could not compile `mathlib`"}}) ==
+      assert Rust.classify(
+               {:ok,
+                %{
+                  exit_code: 101,
+                  tail: "error[E0308]: mismatched types\nerror: could not compile `mathlib`"
+                }}
+             ) ==
                :invalid
 
       assert Rust.classify({:ok, %{exit_code: 101, tail: "test result: ok. 0 failed"}}) ==

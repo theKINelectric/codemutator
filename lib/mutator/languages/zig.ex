@@ -32,7 +32,15 @@ defmodule Mutator.Languages.Zig do
     with {:ok, zig} <- resolve_zig(subject_root) do
       {:ok,
        %{
-         argv: [zig, "build", "test", "--cache-dir", worker.zig_local_cache, "--global-cache-dir", worker.zig_global_cache],
+         argv: [
+           zig,
+           "build",
+           "test",
+           "--cache-dir",
+           worker.zig_local_cache,
+           "--global-cache-dir",
+           worker.zig_global_cache
+         ],
          env: %{
            "ZIG_LOCAL_CACHE_DIR" => worker.zig_local_cache,
            "ZIG_GLOBAL_CACHE_DIR" => worker.zig_global_cache,
@@ -126,7 +134,10 @@ defmodule Mutator.Languages.Zig do
 
     [
       mise_exec_path(version),
-      cellar_zigs() |> Enum.filter(&String.contains?(&1, "/#{prefix}.")) |> Enum.reverse() |> List.first(),
+      cellar_zigs()
+      |> Enum.filter(&String.contains?(&1, "/#{prefix}."))
+      |> Enum.reverse()
+      |> List.first(),
       System.find_executable("zig")
     ]
     |> Enum.reject(&is_nil/1)
@@ -162,8 +173,11 @@ defmodule Mutator.Languages.Zig do
     prefix = version_prefix(wanted)
 
     case System.cmd(zig, ["version"], stderr_to_stdout: true) do
-      {out, 0} -> String.trim(out) == wanted or String.starts_with?(String.trim(out), prefix <> ".")
-      _ -> false
+      {out, 0} ->
+        String.trim(out) == wanted or String.starts_with?(String.trim(out), prefix <> ".")
+
+      _ ->
+        false
     end
   end
 end

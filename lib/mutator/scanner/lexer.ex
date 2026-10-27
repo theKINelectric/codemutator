@@ -54,10 +54,42 @@ defmodule Mutator.Scanner.Lexer do
       block_comments: [{"/*", "*/"}],
       strings: [{"\"", "\"", "\\"}, {"'", "'", "\\"}],
       multi_ops: [
-        "<<=", ">>=",
-        "==", "!=", "<=", ">=", "&&", "||", "<<", ">>", "->", ".*",
-        "+", "-", "*", "/", "%", "=", "<", ">", "!", "&", "|", "^", "~",
-        "?", ".", ":", ";", ",", "(", ")", "[", "]", "{", "}"
+        "<<=",
+        ">>=",
+        "==",
+        "!=",
+        "<=",
+        ">=",
+        "&&",
+        "||",
+        "<<",
+        ">>",
+        "->",
+        ".*",
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+        "=",
+        "<",
+        ">",
+        "!",
+        "&",
+        "|",
+        "^",
+        "~",
+        "?",
+        ".",
+        ":",
+        ";",
+        ",",
+        "(",
+        ")",
+        "[",
+        "]",
+        "{",
+        "}"
       ],
       zig_multiline_strings: true
     }
@@ -70,11 +102,49 @@ defmodule Mutator.Scanner.Lexer do
       strings: [{"\"", "\"", "\\"}, {"'", "'", "\\"}],
       raw_strings: [{"\"\"\"", "\"\"\""}],
       multi_ops: [
-        "===", "!==", "+++", "---", "&&&", "|||",
-        "==", "!=", "<=", ">=", "&&", "||", "++", "--", "..", "->", "|>",
-        "=>", "::", "<>",
-        "+", "-", "*", "/", "%", "=", "<", ">", "!", "&", "|", "^", "~",
-        "?", ".", ";", ",", "(", ")", "[", "]", "{", "}"
+        "===",
+        "!==",
+        "+++",
+        "---",
+        "&&&",
+        "|||",
+        "==",
+        "!=",
+        "<=",
+        ">=",
+        "&&",
+        "||",
+        "++",
+        "--",
+        "..",
+        "->",
+        "|>",
+        "=>",
+        "::",
+        "<>",
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+        "=",
+        "<",
+        ">",
+        "!",
+        "&",
+        "|",
+        "^",
+        "~",
+        "?",
+        ".",
+        ";",
+        ",",
+        "(",
+        ")",
+        "[",
+        "]",
+        "{",
+        "}"
       ],
       sigils: true,
       atom_prefix: true
@@ -88,10 +158,50 @@ defmodule Mutator.Scanner.Lexer do
       block_comments: [{"/*", "*/"}],
       strings: [{"\"", "\"", "\\"}],
       multi_ops: [
-        "<<=", ">>=", "...", "..<", "===", "!==",
-        "==", "!=", "<=", ">=", "&&", "||", "<<", ">>", "->", "??", "?.", "..",
-        "+", "-", "*", "/", "%", "=", "<", ">", "!", "&", "|", "^", "~",
-        "?", ".", ":", ";", ",", "(", ")", "[", "]", "{", "}", "@", "#"
+        "<<=",
+        ">>=",
+        "...",
+        "..<",
+        "===",
+        "!==",
+        "==",
+        "!=",
+        "<=",
+        ">=",
+        "&&",
+        "||",
+        "<<",
+        ">>",
+        "->",
+        "??",
+        "?.",
+        "..",
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+        "=",
+        "<",
+        ">",
+        "!",
+        "&",
+        "|",
+        "^",
+        "~",
+        "?",
+        ".",
+        ":",
+        ";",
+        ",",
+        "(",
+        ")",
+        "[",
+        "]",
+        "{",
+        "}",
+        "@",
+        "#"
       ]
     }
   end
@@ -104,11 +214,54 @@ defmodule Mutator.Scanner.Lexer do
       strings: [{"\"", "\"", "\\"}, {"'", "'", "\\"}],
       raw_strings: [{"\"\"\"", "\"\"\""}],
       multi_ops: [
-        "<<=", ">>=", "...", "===", "!==",
-        "==", "!=", "<=", ">=", "&&", "||", "<<", ">>", "->", "=>", "?.",
-        "?:", "!!", "::", "..", "++", "--",
-        "+", "-", "*", "/", "%", "=", "<", ">", "!", "&", "|", "^", "~",
-        "?", ".", ":", ";", ",", "(", ")", "[", "]", "{", "}", "@", "#"
+        "<<=",
+        ">>=",
+        "...",
+        "===",
+        "!==",
+        "==",
+        "!=",
+        "<=",
+        ">=",
+        "&&",
+        "||",
+        "<<",
+        ">>",
+        "->",
+        "=>",
+        "?.",
+        "?:",
+        "!!",
+        "::",
+        "..",
+        "++",
+        "--",
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+        "=",
+        "<",
+        ">",
+        "!",
+        "&",
+        "|",
+        "^",
+        "~",
+        "?",
+        ".",
+        ":",
+        ";",
+        ",",
+        "(",
+        ")",
+        "[",
+        "]",
+        "{",
+        "}",
+        "@",
+        "#"
       ]
     }
   end
@@ -120,10 +273,48 @@ defmodule Mutator.Scanner.Lexer do
       block_comments: [{"/*", "*/"}],
       strings: [{"\"", "\"", "\\"}, {"'", "'", "\\"}],
       multi_ops: [
-        "<<=", ">>=", "..=",
-        "==", "!=", "<=", ">=", "&&", "||", "<<", ">>", "->", "=>", "::", "..",
-        "+", "-", "*", "/", "%", "=", "<", ">", "!", "&", "|", "^", "~",
-        "?", ".", ":", ";", ",", "(", ")", "[", "]", "{", "}", "@", "#", "$"
+        "<<=",
+        ">>=",
+        "..=",
+        "==",
+        "!=",
+        "<=",
+        ">=",
+        "&&",
+        "||",
+        "<<",
+        ">>",
+        "->",
+        "=>",
+        "::",
+        "..",
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+        "=",
+        "<",
+        ">",
+        "!",
+        "&",
+        "|",
+        "^",
+        "~",
+        "?",
+        ".",
+        ":",
+        ";",
+        ",",
+        "(",
+        ")",
+        "[",
+        "]",
+        "{",
+        "}",
+        "@",
+        "#",
+        "$"
       ],
       rust_lifetimes: true,
       raw_hash_strings: true
@@ -165,7 +356,10 @@ defmodule Mutator.Scanner.Lexer do
 
       {:skip, kind, rest} ->
         stop = consumed + (byte_size(binary) - byte_size(rest))
-        lex_loop(rest, stop, config, [%Token{kind: :skipped, text: kind, start: consumed, stop: stop} | acc])
+
+        lex_loop(rest, stop, config, [
+          %Token{kind: :skipped, text: kind, start: consumed, stop: stop} | acc
+        ])
 
       :whitespace ->
         <<_, rest::binary>> = binary
@@ -369,9 +563,14 @@ defmodule Mutator.Scanner.Lexer do
         {_, rest2} = take_while(rest, fn ch -> ch in ?a..?z or ch in ?A..?Z or ch == ?_ end)
         rest2
 
-      <<c>> == <<close>> and depth > 1 -> skip_sigil(rest, open, close, depth - 1, nesting?, esc)
-      nesting? and c == open -> skip_sigil(rest, open, close, depth + 1, nesting?, esc)
-      true -> skip_sigil(rest, open, close, depth, nesting?, esc)
+      <<c>> == <<close>> and depth > 1 ->
+        skip_sigil(rest, open, close, depth - 1, nesting?, esc)
+
+      nesting? and c == open ->
+        skip_sigil(rest, open, close, depth + 1, nesting?, esc)
+
+      true ->
+        skip_sigil(rest, open, close, depth, nesting?, esc)
     end
   end
 
@@ -404,9 +603,15 @@ defmodule Mutator.Scanner.Lexer do
     {digits, rest} = take_while(binary, fn ch -> digit?(ch) or ch == ?_ end)
 
     case rest do
-      <<?x, r::binary>> when digits == "0" -> radix_digits(r, binary)
-      <<?o, r::binary>> when digits == "0" -> radix_digits(r, binary)
-      <<?b, r::binary>> when digits == "0" -> radix_digits(r, binary)
+      <<?x, r::binary>> when digits == "0" ->
+        radix_digits(r, binary)
+
+      <<?o, r::binary>> when digits == "0" ->
+        radix_digits(r, binary)
+
+      <<?b, r::binary>> when digits == "0" ->
+        radix_digits(r, binary)
+
       <<?., d, r::binary>> when d in ?0..?9 ->
         {_frac, r2} = take_while(r, fn ch -> digit?(ch) or ch == ?_ end)
         exponent(binary, byte_size(binary) - byte_size(r2))
@@ -482,8 +687,6 @@ defmodule Mutator.Scanner.Lexer do
   end
 
   defp count_while(<<>>, _fun, n), do: n
-
-
 
   defp drop_prefix(binary, n), do: binary_part(binary, n, byte_size(binary) - n)
 end

@@ -8,7 +8,6 @@ defmodule Mutator.ScannerTest do
 
   alias Mutator.Scanner
 
-
   defp zscan(src), do: Scanner.scan(:zig, "src/a.zig", src)
   defp escan(src), do: Scanner.scan(:elixir, "lib/a.ex", src)
   defp sscan(src), do: Scanner.scan(:swift, "Src/a.swift", src)
@@ -116,7 +115,11 @@ defmodule Mutator.ScannerTest do
       # `*const`, `*u8` untouched; `p.*` deref untouched; `==` inside body found
       sites = zscan(src)
       assert {{"equality", "==", "!="}, 1} = count(sites, {"equality", "==", "!="})
-      refute Enum.any?(sites, &(&1.original == "*" and &1.file == "src/a.zig" and &1.operator == "arith"))
+
+      refute Enum.any?(
+               sites,
+               &(&1.original == "*" and &1.file == "src/a.zig" and &1.operator == "arith")
+             )
     end
 
     test "error-union suffix ! is never deleted" do

@@ -21,7 +21,11 @@ defmodule MutatorWeb.RunLive.Index do
   defp apply_action(socket, :index, _params), do: socket
 
   @impl true
-  def handle_event("submit", %{"source_path" => path, "mutant_limit" => limit, "scope_filter" => scope}, socket) do
+  def handle_event(
+        "submit",
+        %{"source_path" => path, "mutant_limit" => limit, "scope_filter" => scope},
+        socket
+      ) do
     attrs = %{
       source_path: String.trim(path),
       mutant_limit: parse_limit(limit),
@@ -33,7 +37,15 @@ defmodule MutatorWeb.RunLive.Index do
         {:noreply, push_navigate(socket, to: ~p"/runs/#{run.id}")}
 
       {:error, changeset} ->
-        {:noreply, assign(socket, :form, to_form(Map.merge(attrs, %{"mutant_limit" => limit}), as: :run, errors: changeset.errors))}
+        {:noreply,
+         assign(
+           socket,
+           :form,
+           to_form(Map.merge(attrs, %{"mutant_limit" => limit}),
+             as: :run,
+             errors: changeset.errors
+           )
+         )}
     end
   end
 

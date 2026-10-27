@@ -61,5 +61,4 @@ defmodule MutatorWeb.RunLive.Show do
       s -> "#{Float.round(s * 100, 1)}%"
     end
   end
-
 end

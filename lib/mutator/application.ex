@@ -11,8 +11,7 @@ defmodule Mutator.Application do
       MutatorWeb.Telemetry,
       Mutator.Repo,
       {Ecto.Migrator,
-        repos: Application.fetch_env!(:mutator, :ecto_repos),
-        skip: skip_migrations?()},
+       repos: Application.fetch_env!(:mutator, :ecto_repos), skip: skip_migrations?()},
       {DNSCluster, query: Application.get_env(:mutator, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Mutator.PubSub},
       # Mutation engine: supervised dispatch tasks + the one-active-run

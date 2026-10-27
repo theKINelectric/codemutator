@@ -6,7 +6,14 @@ defmodule Mutator.Languages.Detector do
   can *run* it here.
   """
 
-  @adapters [Mutator.Languages.Zig, Mutator.Languages.ElixirLang, Mutator.Languages.Swift, Mutator.Languages.Kotlin, Mutator.Languages.Rust, Mutator.Languages.JavaScript]
+  @adapters [
+    Mutator.Languages.Zig,
+    Mutator.Languages.ElixirLang,
+    Mutator.Languages.Swift,
+    Mutator.Languages.Kotlin,
+    Mutator.Languages.Rust,
+    Mutator.Languages.JavaScript
+  ]
 
   def adapters, do: @adapters
 
@@ -69,7 +76,11 @@ defmodule Mutator.Languages.Detector do
   defp in_scope?(_rel, ""), do: true
 
   defp in_scope?(rel, scope) do
-    prefix = scope |> String.trim_leading("/") |> then(&if String.ends_with?(&1, "/"), do: &1, else: &1 <> "/")
+    prefix =
+      scope
+      |> String.trim_leading("/")
+      |> then(&if String.ends_with?(&1, "/"), do: &1, else: &1 <> "/")
+
     String.starts_with?(rel, prefix) or rel == String.trim_trailing(prefix, "/")
   end
 
@@ -82,9 +93,22 @@ defmodule Mutator.Languages.Detector do
 
   # Vendored/generated/build directories are copied but never mutated.
   @excluded_dirs [
-    "test", "tests", "spec", "vendor", "node_modules", "deps", "_build",
-    "zig-out", ".zig-cache", "build", "dist", "target", ".build", ".git",
-    "fixtures", "test/fixtures"
+    "test",
+    "tests",
+    "spec",
+    "vendor",
+    "node_modules",
+    "deps",
+    "_build",
+    "zig-out",
+    ".zig-cache",
+    "build",
+    "dist",
+    "target",
+    ".build",
+    ".git",
+    "fixtures",
+    "test/fixtures"
   ]
 
   defp excluded_path?(rel) do

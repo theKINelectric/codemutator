@@ -10,8 +10,8 @@ defmodule Mutator.FlowExtraSmokeTest do
   defmodule SmokePipeline do
     use FlowExtra.Pipeline
 
-    pipe :double, count: 2
-    pipe :tag
+    pipe(:double, count: 2)
+    pipe(:tag)
 
     defstruct [:number, :doubled, :tagged, :replica]
 
@@ -27,8 +27,8 @@ defmodule Mutator.FlowExtraSmokeTest do
   defmodule RaisingPipeline do
     use FlowExtra.Pipeline
 
-    pipe :boom
-    error_pipe :rescue_boom
+    pipe(:boom)
+    error_pipe(:rescue_boom)
 
     defstruct [:value]
 
@@ -72,7 +72,7 @@ defmodule Mutator.FlowExtraSmokeTest do
   defmodule SlowPipeline do
     use FlowExtra.Pipeline
 
-    pipe :slow
+    pipe(:slow)
 
     defstruct [:n]
 

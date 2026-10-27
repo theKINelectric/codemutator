@@ -30,37 +30,154 @@ defmodule Mutator.Scanner do
   # position. Idents like `return`, `and`, `or`, `if` start expressions; other
   # idents end them (operand position).
   @prefix_idents [
-    "return", "and", "or", "orelse", "catch", "else", "try", "comptime",
-    "if", "while", "for", "switch", "defer", "not", "do", "then", "case",
-    "in", "as", "is", "where", "select", "suspend", "resume", "align",
-    "test", "fn", "const", "var", "pub", "export", "inline", "noalias",
-    "volatile", "allowzero", "linksection", "callconv", "unreachable",
-    "break", "continue", "errdefer", "usingnamespace", "false", "true",
-    "struct", "union", "enum", "opaque", "error", "packed", "extern",
-    "when", "guard", "let", "val", "init", "deinit",
+    "return",
+    "and",
+    "or",
+    "orelse",
+    "catch",
+    "else",
+    "try",
+    "comptime",
+    "if",
+    "while",
+    "for",
+    "switch",
+    "defer",
+    "not",
+    "do",
+    "then",
+    "case",
+    "in",
+    "as",
+    "is",
+    "where",
+    "select",
+    "suspend",
+    "resume",
+    "align",
+    "test",
+    "fn",
+    "const",
+    "var",
+    "pub",
+    "export",
+    "inline",
+    "noalias",
+    "volatile",
+    "allowzero",
+    "linksection",
+    "callconv",
+    "unreachable",
+    "break",
+    "continue",
+    "errdefer",
+    "usingnamespace",
+    "false",
+    "true",
+    "struct",
+    "union",
+    "enum",
+    "opaque",
+    "error",
+    "packed",
+    "extern",
+    "when",
+    "guard",
+    "let",
+    "val",
+    "init",
+    "deinit",
     # rust declaration/expression keywords; operand-like idents (`self`,
     # `Self`, `super`, `crate`, `await`, `Some`/`None`/`Ok`/`Err`) stay out
-    "mut", "ref", "match", "loop", "unsafe", "async", "dyn", "box", "impl",
-    "mod", "use", "type", "trait", "move", "macro_rules", "macro", "static",
-    "yield", "raw", "default"
+    "mut",
+    "ref",
+    "match",
+    "loop",
+    "unsafe",
+    "async",
+    "dyn",
+    "box",
+    "impl",
+    "mod",
+    "use",
+    "type",
+    "trait",
+    "move",
+    "macro_rules",
+    "macro",
+    "static",
+    "yield",
+    "raw",
+    "default"
   ]
 
   @prefix_ops [
-    "(", "[", "{", ",", "=", ";", "!", "&&", "||", "==", "!=", "<", "<=",
-    ">", ">=", "+", "-", "*", "/", "->", "=>", "::", "..", "..<", "?:",
-    "!!", "|>", "|", "&", ":", "else", "when", "catch", "return", "not",
-    "and", "or"
+    "(",
+    "[",
+    "{",
+    ",",
+    "=",
+    ";",
+    "!",
+    "&&",
+    "||",
+    "==",
+    "!=",
+    "<",
+    "<=",
+    ">",
+    ">=",
+    "+",
+    "-",
+    "*",
+    "/",
+    "->",
+    "=>",
+    "::",
+    "..",
+    "..<",
+    "?:",
+    "!!",
+    "|>",
+    "|",
+    "&",
+    ":",
+    "else",
+    "when",
+    "catch",
+    "return",
+    "not",
+    "and",
+    "or"
   ]
 
   defmodule Site do
     @enforce_keys [
-      :file, :function, :function_line, :function_end_line, :line,
-      :byte_start, :byte_end, :operator, :original, :replacement, :site_key
+      :file,
+      :function,
+      :function_line,
+      :function_end_line,
+      :line,
+      :byte_start,
+      :byte_end,
+      :operator,
+      :original,
+      :replacement,
+      :site_key
     ]
 
     defstruct [
-      :file, :function, :function_line, :function_end_line, :line,
-      :byte_start, :byte_end, :operator, :original, :replacement, :site_key,
+      :file,
+      :function,
+      :function_line,
+      :function_end_line,
+      :line,
+      :byte_start,
+      :byte_end,
+      :operator,
+      :original,
+      :replacement,
+      :site_key,
       file_hash: nil
     ]
   end
@@ -75,8 +192,16 @@ defmodule Mutator.Scanner do
     LHS (`)`, `]`, literal, string) so generic brackets are never mutated.
     """
     defstruct [
-      :language, :block_style, :fn_keywords, :test_keywords, :test_name_prefixes,
-      :operators, :delete_unary, :unary_next_skip, :bools, :infix_idents,
+      :language,
+      :block_style,
+      :fn_keywords,
+      :test_keywords,
+      :test_name_prefixes,
+      :operators,
+      :delete_unary,
+      :unary_next_skip,
+      :bools,
+      :infix_idents,
       :comparison_lhs_ops_only
     ]
   end
@@ -96,9 +221,14 @@ defmodule Mutator.Scanner do
       test_keywords: ["test"],
       test_name_prefixes: [],
       operators: %{
-        "==" => "!=", "!=" => "==",
-        "<" => "<=", "<=" => "<", ">" => ">=", ">=" => ">",
-        "+" => "-", "-" => "+"
+        "==" => "!=",
+        "!=" => "==",
+        "<" => "<=",
+        "<=" => "<",
+        ">" => ">=",
+        ">=" => ">",
+        "+" => "-",
+        "-" => "+"
       },
       delete_unary: ["!", "-"],
       unary_next_skip: [],
@@ -116,10 +246,18 @@ defmodule Mutator.Scanner do
       test_keywords: ["test", "describe"],
       test_name_prefixes: [],
       operators: %{
-        "==" => "!=", "!=" => "==",
-        "<" => "<=", "<=" => "<", ">" => ">=", ">=" => ">",
-        "+" => "-", "-" => "+", "*" => "/", "/" => "*",
-        "&&" => "||", "||" => "&&"
+        "==" => "!=",
+        "!=" => "==",
+        "<" => "<=",
+        "<=" => "<",
+        ">" => ">=",
+        ">=" => ">",
+        "+" => "-",
+        "-" => "+",
+        "*" => "/",
+        "/" => "*",
+        "&&" => "||",
+        "||" => "&&"
       },
       delete_unary: ["!", "-", "not"],
       unary_next_skip: [],
@@ -137,9 +275,12 @@ defmodule Mutator.Scanner do
       test_keywords: [],
       test_name_prefixes: ["test"],
       operators: %{
-        "==" => "!=", "!=" => "==",
-        "+" => "-", "-" => "+",
-        "&&" => "||", "||" => "&&"
+        "==" => "!=",
+        "!=" => "==",
+        "+" => "-",
+        "-" => "+",
+        "&&" => "||",
+        "||" => "&&"
       },
       delete_unary: ["!", "-"],
       unary_next_skip: [],
@@ -157,9 +298,14 @@ defmodule Mutator.Scanner do
       test_keywords: [],
       test_name_prefixes: ["test"],
       operators: %{
-        "==" => "!=", "!=" => "==", "===" => "!==", "!==" => "===",
-        "+" => "-", "-" => "+",
-        "&&" => "||", "||" => "&&"
+        "==" => "!=",
+        "!=" => "==",
+        "===" => "!==",
+        "!==" => "===",
+        "+" => "-",
+        "-" => "+",
+        "&&" => "||",
+        "||" => "&&"
       },
       delete_unary: ["!", "-"],
       unary_next_skip: ["in", "is"],
@@ -180,9 +326,14 @@ defmodule Mutator.Scanner do
       test_keywords: ["test", "tests"],
       test_name_prefixes: ["test"],
       operators: %{
-        "==" => "!=", "!=" => "==",
-        "+" => "-", "-" => "+", "*" => "/", "/" => "*",
-        "&&" => "||", "||" => "&&"
+        "==" => "!=",
+        "!=" => "==",
+        "+" => "-",
+        "-" => "+",
+        "*" => "/",
+        "/" => "*",
+        "&&" => "||",
+        "||" => "&&"
       },
       delete_unary: ["!", "-"],
       unary_next_skip: [],
@@ -204,7 +355,8 @@ defmodule Mutator.Scanner do
   # -- scanning --------------------------------------------------------------
 
   @doc "Scan one file's bytes; returns sites in byte order."
-  def scan(language, rel_path, source) when language in [:javascript, :typescript] and is_binary(source) do
+  def scan(language, rel_path, source)
+      when language in [:javascript, :typescript] and is_binary(source) do
     Mutator.Scanner.JavaScript.scan(rel_path, source)
   end
 
@@ -264,7 +416,7 @@ defmodule Mutator.Scanner do
     # parameter list of the function it belongs to.
     {_state, closed} =
       Enum.reduce(indexed, {%{stack: [], pending: nil, paren: 0}, []}, fn {token, i},
-                                                                           {state, closed} ->
+                                                                          {state, closed} ->
         case token do
           %Token{kind: :op, text: "("} ->
             {update_in(state, [:paren], &(&1 + 1)), closed}
@@ -282,7 +434,13 @@ defmodule Mutator.Scanner do
                 {:other, nil}
               end
 
-            entry = %Block{kind: kind || :other, name: name, start_byte: token.start, stop_byte: :open, depth: depth}
+            entry = %Block{
+              kind: kind || :other,
+              name: name,
+              start_byte: token.start,
+              stop_byte: :open,
+              depth: depth
+            }
 
             {%{state | stack: [entry | state.stack], pending: nil}, closed}
 
@@ -416,7 +574,6 @@ defmodule Mutator.Scanner do
     end
   end
 
-
   # A function name (declared on the fn block) is stored on the block when it
   # opens; test-name prefixes override function kind for XCTest/JUnit naming.
   # Single pass: tokens and blocks are both in byte order, so attribution is
@@ -435,8 +592,12 @@ defmodule Mutator.Scanner do
 
     value =
       cond do
-        active == [] -> :none
-        Enum.any?(active, &(&1.kind == :test)) -> :excluded
+        active == [] ->
+          :none
+
+        Enum.any?(active, &(&1.kind == :test)) ->
+          :excluded
+
         true ->
           case Enum.filter(active, &(&1.kind == :function)) do
             [] -> :none
@@ -551,6 +712,8 @@ defmodule Mutator.Scanner do
     end
   end
 
-  defp unary_next_blocked?(%Token{kind: :ident, text: t}, %Profile{unary_next_skip: skip}), do: t in skip
+  defp unary_next_blocked?(%Token{kind: :ident, text: t}, %Profile{unary_next_skip: skip}),
+    do: t in skip
+
   defp unary_next_blocked?(_, _), do: false
 end

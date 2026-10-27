@@ -35,7 +35,11 @@ defmodule Mutator.Execution.RunCoordinator do
   def run(run_id) do
     run = Runs.get_run(run_id)
 
-    case PrepareRun.call(prepare_pipeline(run_id), %PrepareRun{run_id: run_id, source_path: run.source_path}, :infinity) do
+    case PrepareRun.call(
+           prepare_pipeline(run_id),
+           %PrepareRun{run_id: run_id, source_path: run.source_path},
+           :infinity
+         ) do
       %PrepareRun{error: nil} = prepared ->
         dispatch_loop(run_id, prepared)
 
@@ -78,25 +82,24 @@ defmodule Mutator.Execution.RunCoordinator do
 
         Runs.transition(Runs.get_run(run_id), "running", %{run_budget_ms: budget_ms})
 
-        budget_deadline = System.monotonic_time(:millisecond) + budget_ms +
-                            (prepared.baseline_ms || 0)
+        budget_deadline =
+          System.monotonic_time(:millisecond) + budget_ms +
+            (prepared.baseline_ms || 0)
 
         {:ok, task_sup} = Task.Supervisor.start_link(name: via(run_id))
 
         try do
-          loop(
-            %{
-              run_id: run_id,
-              pipeline: pipeline,
-              task_sup: task_sup,
-              prepared: prepared,
-              pending: sites,
-              in_flight: %{},
-              slot_counter: 0,
-              lanes: lanes,
-              budget_deadline: budget_deadline
-            }
-          )
+          loop(%{
+            run_id: run_id,
+            pipeline: pipeline,
+            task_sup: task_sup,
+            prepared: prepared,
+            pending: sites,
+            in_flight: %{},
+            slot_counter: 0,
+            lanes: lanes,
+            budget_deadline: budget_deadline
+          })
         after
           ExecuteMutant.stop(pipeline)
           GenServer.stop(task_sup)
@@ -200,12 +203,12 @@ defmodule Mutator.Execution.RunCoordinator do
     end
   end
 
-
   defp dispatch_site(state, site, _dispatch_index, lane_key) do
     lane = state.lanes[lane_key]
 
     {:ok, %{argv: argv, env: env}} =
       state.prepared.adapter.preflight(state.prepared.ws.snapshot, lane)
+
     input = %ExecuteMutant{
       run_id: state.run_id,
       site_id: site.id,
@@ -256,7 +259,6 @@ defmodule Mutator.Execution.RunCoordinator do
     finalize(state.run_id, "budget_exhausted")
   end
 
-
   defp wait_for_in_flight(state) do
     unless map_size(state.in_flight) == 0 do
       Process.sleep(@poll_ms)
@@ -291,7 +293,9 @@ defmodule Mutator.Execution.RunCoordinator do
       failure_reason: inspect(reason) |> String.slice(0, 2_000)
     })
 
-    keep = Application.get_env(:mutator, :keep_failed_workspace, false) or System.get_env("MUTATOR_KEEP_WS") == "1"
+    keep =
+      Application.get_env(:mutator, :keep_failed_workspace, false) or
+        System.get_env("MUTATOR_KEEP_WS") == "1"
 
     unless keep do
       Workspaces.cleanup_run(Integer.to_string(run_id))

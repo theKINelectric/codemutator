@@ -9,8 +9,8 @@ defmodule MutatorWeb.RunComponents do
   def stat(assigns) do
     ~H"""
     <div class={"rounded-lg border border-slate-200 bg-white px-4 py-3 #{if @emphasis, do: "ring-1 ring-sky-300", else: ""}"}>
-      <div class="text-xs uppercase tracking-wide text-slate-500"><%= @label %></div>
-      <div class="mt-0.5 text-lg font-semibold text-slate-900"><%= @value %></div>
+      <div class="text-xs uppercase tracking-wide text-slate-500">{@label}</div>
+      <div class="mt-0.5 text-lg font-semibold text-slate-900">{@value}</div>
     </div>
     """
   end
@@ -30,7 +30,7 @@ defmodule MutatorWeb.RunComponents do
     assigns = assign(assigns, :class, class)
 
     ~H"""
-    <span class={"rounded px-1.5 py-0.5 text-xs font-medium #{@class}"}><%= @status %></span>
+    <span class={"rounded px-1.5 py-0.5 text-xs font-medium #{@class}"}>{@status}</span>
     """
   end
 end

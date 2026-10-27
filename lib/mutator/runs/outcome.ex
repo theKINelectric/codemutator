@@ -39,7 +39,17 @@ defmodule Mutator.Runs.Outcome do
 
   def changeset(outcome, attrs) do
     outcome
-    |> cast(attrs, [:run_id, :site_id, :status, :reason, :phase, :exit_code, :elapsed_ms, :log_path, :log_excerpt])
+    |> cast(attrs, [
+      :run_id,
+      :site_id,
+      :status,
+      :reason,
+      :phase,
+      :exit_code,
+      :elapsed_ms,
+      :log_path,
+      :log_excerpt
+    ])
     |> validate_required([:run_id, :site_id, :status])
     |> validate_inclusion(:status, @statuses)
     |> unique_constraint(:site_id, name: :outcomes_run_id_site_id_index)
