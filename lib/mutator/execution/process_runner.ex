@@ -68,14 +68,22 @@ defmodule Mutator.Execution.ProcessRunner do
     port = Port.open({:spawn_executable, hd(wrapped)}, port_opts)
     started = System.monotonic_time(:millisecond)
 
-    await(%{
-      port: port,
-      log: log,
-      timeout_at: started + timeout,
-      started: started,
-      buffer: "",
-      log_path: log_path
-    })
+    {:os_pid, group_id} = Port.info(port, :os_pid)
+
+    try do
+      await(%{
+        port: port,
+        log: log,
+        timeout_at: started + timeout,
+        started: started,
+        buffer: "",
+        log_path: log_path
+      })
+    after
+      # The group can outlive its leader. Service-mode JS children share
+      # this group; retain its identity even after the port has exited.
+      System.cmd("/bin/kill", ["-9", "-#{group_id}"], stderr_to_stdout: true)
+    end
   end
 
   defp await(%{port: port} = st) do
@@ -102,11 +110,13 @@ defmodule Mutator.Execution.ProcessRunner do
     after
       deadline_wait ->
         kill_group(port)
+
         receive do
           {^port, {:exit_status, _code}} -> :ok
         after
           @grace_ms ->
             kill_group(port, :kill)
+
             receive do
               {^port, {:exit_status, _code}} -> :ok
             after
@@ -140,7 +150,10 @@ defmodule Mutator.Execution.ProcessRunner do
 
   defp append_bounded(buffer, chunk) do
     data = buffer <> chunk
-    if byte_size(data) > @tail_bytes, do: binary_part(data, byte_size(data) - @tail_bytes, @tail_bytes), else: data
+
+    if byte_size(data) > @tail_bytes,
+      do: binary_part(data, byte_size(data) - @tail_bytes, @tail_bytes),
+      else: data
   end
 
   # Subject subprocesses must see a normal development environment, not the

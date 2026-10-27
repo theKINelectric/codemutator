@@ -76,10 +76,27 @@ defmodule Mutator.Runs do
   # -- lifecycle -------------------------------------------------------------
 
   def transition(run, state, extra \\ %{}) do
-    run
-    |> Run.changeset(Map.merge(%{state: state}, extra))
-    |> Repo.update()
-    |> tap(fn {:ok, updated} -> broadcast(updated.id, {:state, state}) end)
+    changeset = Run.changeset(run, Map.put(extra, :state, state))
+
+    if changeset.valid? do
+      # Cancellation is terminal even when a pipeline stage holds an older
+      # struct. The predicate and write are one SQL operation, so an in-flight
+      # baseline cannot overwrite a concurrent cancellation.
+      query = from(r in Run, where: r.id == ^run.id)
+      query = if state == "cancelled", do: query, else: where(query, [r], r.state != "cancelled")
+
+      changes =
+        changeset.changes
+        |> Map.put(:state, state)
+        |> Map.put(:updated_at, DateTime.utc_now() |> DateTime.truncate(:second))
+
+      Repo.update_all(query, set: Map.to_list(changes))
+      updated = Repo.get!(Run, run.id)
+      broadcast(updated.id, {:state, updated.state})
+      {:ok, updated}
+    else
+      {:error, changeset}
+    end
   end
 
   # -- sites -----------------------------------------------------------------

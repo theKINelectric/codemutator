@@ -1,0 +1,1 @@
+{"schemaVersion":1,"language":"javascript-typescript","runner":{"kind":"node-test","files":["test/client.test.mjs"]},"typecheck":{"kind":"typescript","project":"tsconfig.json"},"source":{"include":["src/**/*.ts"],"exclude":[]}}

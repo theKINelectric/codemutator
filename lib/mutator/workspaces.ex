@@ -38,6 +38,8 @@ defmodule Mutator.Workspaces do
     excludes = Application.get_env(:mutator, :copy_excludes, [])
 
     with :ok <- validate_source(source),
+         :ok <- validate_scope(copy_scope),
+         :ok <- validate_javascript_links(source),
          run_dir = Path.join(root, run_id),
          :ok <- reset_dir(run_dir),
          :ok <- File.mkdir_p(run_dir),
@@ -191,6 +193,15 @@ defmodule Mutator.Workspaces do
     do: copy_tree(src, dest, excludes)
 
   defp copy_scoped(src, dest, excludes, scope) do
+    # JS configuration can extend other files or import sibling packages.
+    # Scope narrows mutation selection; a physical whole-project snapshot
+    # retains the exact test/compiler dependency graph.
+    if File.exists?(Path.join(src, ".codemutator.json")),
+      do: copy_tree(src, dest, excludes),
+      else: copy_language_scope(src, dest, excludes, scope)
+  end
+
+  defp copy_language_scope(src, dest, excludes, scope) do
     scope = String.trim_leading(scope, "/")
 
     with :ok <- File.mkdir_p(dest) do
@@ -204,8 +215,9 @@ defmodule Mutator.Workspaces do
       # config, vendored deps, priv (migrations/static), assets. Missing any
       # of these turns `mix test` into an interactive Hex prompt that hangs
       # to the deadline (observed in the self-hosting dogfood).
-      extra_dirs = ~w(test tests spec config deps priv assets .cargo) ++
-                     ~w(gradle gradlew build.gradle settings.gradle Packages Package.swift)
+      extra_dirs =
+        ~w(test tests spec config deps priv assets .cargo) ++
+          ~w(gradle gradlew build.gradle settings.gradle Packages Package.swift)
 
       Enum.each(extra_dirs, fn d ->
         sdir = Path.join(src, d)
@@ -231,6 +243,48 @@ defmodule Mutator.Workspaces do
   end
 
   # -- validation ------------------------------------------------------------
+
+  # JS profiles require physical dependency trees. Reject links before rsync
+  # drops them, so a changed dependency graph cannot masquerade as the subject.
+  defp validate_javascript_links(source) do
+    if File.exists?(Path.join(source, ".codemutator.json")),
+      do: reject_links(source, source),
+      else: :ok
+  end
+
+  defp reject_links(path, root) do
+    case File.lstat(path) do
+      {:ok, %{type: :symlink}} ->
+        {:error, {:unsupported_javascript_symlink, Path.relative_to(path, root)}}
+
+      {:ok, %{type: :directory}} ->
+        with {:ok, entries} <- File.ls(path) do
+          entries
+          |> Enum.reject(&(&1 in [".git", ".hg"]))
+          |> Enum.reduce_while(:ok, fn name, :ok ->
+            case reject_links(Path.join(path, name), root) do
+              :ok -> {:cont, :ok}
+              error -> {:halt, error}
+            end
+          end)
+        end
+
+      {:ok, _} ->
+        :ok
+
+      error ->
+        error
+    end
+  end
+
+  defp validate_scope(nil), do: :ok
+  defp validate_scope(""), do: :ok
+
+  defp validate_scope(scope) when is_binary(scope) do
+    if Path.type(scope) == :relative and not Enum.any?(Path.split(scope), &(&1 == "..")),
+      do: :ok,
+      else: {:error, :invalid_scope}
+  end
 
   defp validate_source(source) do
     root = workspace_root() |> Path.expand()

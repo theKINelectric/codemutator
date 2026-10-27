@@ -1,15 +1,37 @@
 <div class="mx-auto max-w-4xl px-4 py-8">
-  <h1 class="text-2xl font-black tracking-tight text-slate-900">💥🔫 code<span class="text-rose-500">MUTATOR</span></h1>
+  <h1 class="text-2xl font-black tracking-tight text-slate-900">
+    💥🔫 code<span class="text-rose-500">MUTATOR</span>
+  </h1>
   <p class="mt-1 text-sm text-slate-600">
-    Mutation testing as a service for Elixir, Zig, Kotlin and Swift. The subject is cloned into
-    <code class="rounded bg-slate-100 px-1">temporary_subject/</code> and never touched.
+    Mutation testing for Zig and Rust, plus JavaScript/TypeScript through an explicit Node 26 profile.
+    Elixir and Swift adapters and Kotlin detection are also available. The subject is copied into
+    <code class="rounded bg-slate-100 px-1">temporary_subject/</code>
+    and never touched.
     Agents: <.link href="/agents" class="text-sky-700 hover:underline">CLI &amp; JSON API instructions</.link>.
+  </p>
+  <p class="mt-2 text-sm text-slate-600">
+    JavaScript/TypeScript requires <code class="rounded bg-slate-100 px-1">.codemutator.json</code>,
+    Node's built-in test runner and physical dependency files. TypeScript uses a separate compiler check.
+    JSX/TSX execution and linked dependency trees are outside this profile.
   </p>
 
   <.simple_form for={@form} phx-submit="submit" class="mt-6">
-    <.input field={@form[:source_path]} label="Local subject directory (absolute path)" placeholder="/path/to/project" required />
-    <.input field={@form[:mutant_limit]} label="Mutant limit (optional)" placeholder="e.g. 10 for a first bounded run" />
-    <.input field={@form[:scope_filter]} label="Path filter (optional)" placeholder="e.g. src/ to mutate only the main tree" />
+    <.input
+      field={@form[:source_path]}
+      label="Local subject directory (absolute path)"
+      placeholder="/path/to/project"
+      required
+    />
+    <.input
+      field={@form[:mutant_limit]}
+      label="Mutant limit (optional)"
+      placeholder="e.g. 10 for a first bounded run"
+    />
+    <.input
+      field={@form[:scope_filter]}
+      label="Path filter (optional)"
+      placeholder="e.g. src/ to mutate only the main tree"
+    />
     <:actions>
       <.button phx-disable-with="Queueing…">Queue mutation run</.button>
     </:actions>
@@ -20,22 +42,26 @@
   <div class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
     <div :for={run <- @runs} class="flex items-center gap-4 px-4 py-3">
       <.link href={~p"/runs/#{run.id}"} class="font-mono text-sm text-sky-700 hover:underline">
-        #<%= run.id %>
+        #{run.id}
       </.link>
 
-      <span class={"rounded-full px-2 py-0.5 text-xs font-medium #{state_class(run.state)}"}><%= run.state %></span>
+      <span class={"rounded-full px-2 py-0.5 text-xs font-medium #{state_class(run.state)}"}>
+        {run.state}
+      </span>
 
       <span class="min-w-0 flex-1 truncate text-sm text-slate-700" title={run.source_path}>
-        <%= run.source_path %>
+        {run.source_path}
       </span>
 
       <span class="text-xs text-slate-500">
-        <%= run.language %> · k <%= run.killed %> / s <%= run.survived %>
-        <span :if={run.invalid > 0}> · inv <%= run.invalid %></span>
-        <span :if={run.error_count > 0}> · err <%= run.error_count %></span>
+        {run.language} · k {run.killed} / s {run.survived}
+        <span :if={run.invalid > 0}>· inv {run.invalid}</span>
+        <span :if={run.error_count > 0}>· err {run.error_count}</span>
       </span>
 
-      <span class="w-14 text-right font-mono text-sm font-semibold text-slate-900"><%= score_badge(run) %></span>
+      <span class="w-14 text-right font-mono text-sm font-semibold text-slate-900">
+        {score_badge(run)}
+      </span>
 
       <button
         :if={run.state in ~w(queued preparing baselining scanning running)}

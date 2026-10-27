@@ -17,16 +17,34 @@ defmodule Mutator.Pipelines.ExecuteMutant do
   alias Mutator.{Runs, Workspaces}
   alias Mutator.Execution.ProcessRunner
 
-  pipe :execute, count: 2
-  pipe :record, count: 1
+  pipe(:execute, count: 2)
+  pipe(:record, count: 1)
 
-  error_pipe :on_unexpected_error
+  error_pipe(:on_unexpected_error)
 
   defstruct [
-    :run_id, :site_id, :site_key, :file, :byte_start, :byte_end, :original,
-    :replacement, :file_hash, :timeout_ms, :argv, :env, :adapter, :ws_root,
+    :run_id,
+    :site_id,
+    :site_key,
+    :file,
+    :byte_start,
+    :byte_end,
+    :original,
+    :replacement,
+    :file_hash,
+    :timeout_ms,
+    :argv,
+    :env,
+    :adapter,
+    :ws_root,
     :lane,
-    :status, :reason, :exit_code, :elapsed_ms, :log_path, :tail, :error
+    :status,
+    :reason,
+    :exit_code,
+    :elapsed_ms,
+    :log_path,
+    :tail,
+    :error
   ]
 
   # -- stages ----------------------------------------------------------------
@@ -115,14 +133,28 @@ defmodule Mutator.Pipelines.ExecuteMutant do
     %{data | status: "killed", reason: "timeout", elapsed_ms: elapsed, log_path: log}
   end
 
-  defp classify_into(data, {:ok, %{exit_code: code, elapsed_ms: elapsed, tail: tail, log_path: log}}) do
+  defp classify_into(
+         data,
+         {:ok, %{exit_code: code, elapsed_ms: elapsed, tail: tail, log_path: log}}
+       ) do
     data = %{data | exit_code: code, elapsed_ms: elapsed, tail: tail, log_path: log}
 
     case data.adapter.classify({:ok, %{exit_code: code, tail: tail}}) do
       :survived -> %{data | status: "survived"}
       {:killed, reason} -> %{data | status: "killed", reason: Atom.to_string(reason)}
       :invalid -> %{data | status: "invalid"}
-      :unclassified -> %{data | status: "error", reason: "unclassified"}
+      :unclassified -> %{data | status: "error", reason: runner_error(data.adapter, tail)}
+    end
+  end
+
+  defp runner_error(adapter, tail) do
+    if function_exported?(adapter, :result_metadata, 1) do
+      case adapter.result_metadata(tail) do
+        {:ok, %{"status" => "error", "reason" => reason}} when is_binary(reason) -> reason
+        _ -> "unclassified"
+      end
+    else
+      "unclassified"
     end
   end
 

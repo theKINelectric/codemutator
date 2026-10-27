@@ -1,7 +1,9 @@
 <div class="bg-zinc-950">
   <div class="mx-auto flex min-h-screen max-w-4xl flex-col px-6 text-zinc-100">
     <header class="flex items-center justify-between py-6 text-sm">
-      <span class="text-lg font-black tracking-tight">💥🔫 code<span class="text-rose-400">MUTATOR</span></span>
+      <span class="text-lg font-black tracking-tight">
+        💥🔫 code<span class="text-rose-400">MUTATOR</span>
+      </span>
       <nav class="flex items-center gap-5 font-semibold">
         <a href="/runs" class="text-zinc-300 hover:text-white">Runs</a>
         <a href="/agents" class="text-zinc-300 hover:text-white">Agent API</a>
@@ -14,7 +16,7 @@
       </h1>
       <p class="mt-4 max-w-2xl text-zinc-400">
         Submit a local codebase. codeMUTATOR clones it, applies one mutation at a
-        time to a private copy, runs the project's own tests, and reports which
+        time to a private copy, runs the configured tests, and reports which
         mutants your suite kills — per function, with full logs. The original
         directory is never touched.
       </p>
@@ -22,11 +24,18 @@
       <div class="mt-8 grid gap-3 sm:grid-cols-3">
         <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
           <div class="text-xs uppercase tracking-wide text-zinc-500">Languages</div>
-          <div class="mt-1 text-sm">Zig 0.16 qualified · Elixir · Swift · Kotlin (detect)</div>
+          <div class="mt-1 text-sm">
+            Zig 0.16 · Rust · JavaScript/TypeScript (explicit Node 26 profile)
+          </div>
+          <div class="mt-2 text-xs text-zinc-500">
+            Elixir and Swift adapters · Kotlin detection
+          </div>
         </div>
         <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
           <div class="text-xs uppercase tracking-wide text-zinc-500">Agents first</div>
-          <div class="mt-1 text-sm">JSON API + CLI at <a href="/agents" class="text-rose-400 hover:underline">/agents</a></div>
+          <div class="mt-1 text-sm">
+            JSON API + CLI at <a href="/agents" class="text-rose-400 hover:underline">/agents</a>
+          </div>
         </div>
         <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
           <div class="text-xs uppercase tracking-wide text-zinc-500">Score</div>
@@ -35,10 +44,16 @@
       </div>
 
       <div class="mt-8">
-        <a href="/runs" class="inline-flex items-center gap-2 rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-rose-400">
+        <a
+          href="/runs"
+          class="inline-flex items-center gap-2 rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-rose-400"
+        >
           Submit a run <span aria-hidden="true">&rarr;</span>
         </a>
-        <a href="/agents" class="ml-3 inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-900">
+        <a
+          href="/agents"
+          class="ml-3 inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-200 hover:bg-zinc-900"
+        >
           Agent instructions
         </a>
       </div>

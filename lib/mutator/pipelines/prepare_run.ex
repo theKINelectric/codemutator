@@ -23,16 +23,27 @@ defmodule Mutator.Pipelines.PrepareRun do
   @mutant_cap_ms 20 * 60_000
   @run_budget_ms 30 * 60_000
 
-  pipe :prepare_workspace
-  pipe :detect_language
-  pipe :run_baseline
-  pipe :scan_and_persist
+  pipe(:prepare_workspace)
+  pipe(:detect_language)
+  pipe(:run_baseline)
+  pipe(:scan_and_persist)
 
-  error_pipe :on_unexpected_error
+  error_pipe(:on_unexpected_error)
 
   defstruct [
-    :run_id, :source_path, :ws, :adapter, :language, :argv_template, :env_template,
-    :baseline_ms, :mutant_timeout_ms, :scan_result, :error, :baseline_worker
+    :run_id,
+    :source_path,
+    :ws,
+    :adapter,
+    :language,
+    :argv_template,
+    :env_template,
+    :baseline_ms,
+    :mutant_timeout_ms,
+    :scan_result,
+    :error,
+    :baseline_worker,
+    :toolchain_meta
   ]
 
   # -- stages ----------------------------------------------------------------
@@ -43,7 +54,11 @@ defmodule Mutator.Pipelines.PrepareRun do
     scope = run_scope(data.run_id)
 
     case Workspaces.prepare(Integer.to_string(data.run_id), data.source_path, scope) do
-      {:ok, ws, _manifest} ->
+      {:ok, ws, manifest} ->
+        digest =
+          :crypto.hash(:sha256, :erlang.term_to_binary(manifest)) |> Base.encode16(case: :lower)
+
+        Runs.transition(Runs.get_run(data.run_id), "preparing", %{snapshot_hash: digest})
         %{data | ws: ws}
 
       {:error, reason} ->
@@ -57,17 +72,29 @@ defmodule Mutator.Pipelines.PrepareRun do
     with {:ok, adapter} <- Detector.detect(data.ws.snapshot),
          {:ok, worker} <- Workspaces.make_worker(data.ws, "baseline"),
          # The baseline copy runs with private caches like any mutant worker.
-         {:ok, %{argv: argv, env: env}} <- adapter.preflight(data.ws.snapshot, worker) do
+         {:ok, %{argv: argv, env: env} = preflight} <- adapter.preflight(data.ws.snapshot, worker) do
       require Logger
       Logger.info("run #{data.run_id} baseline argv: #{Enum.join(argv, " ")}")
-      Runs.transition(Runs.get_run(data.run_id), "baselining", %{toolchain: %{"argv" => argv}})
+      metadata = Map.get(preflight, :metadata, %{}) |> Map.put("argv", argv)
+
+      scanner_version =
+        if adapter.id() == :javascript, do: "js-ts-ast-v1", else: "#{adapter.id()}-token-1"
+
+      Runs.transition(Runs.get_run(data.run_id), "baselining", %{
+        toolchain: metadata,
+        language: Atom.to_string(adapter.id()),
+        scanner_version: scanner_version,
+        test_argv: argv
+      })
+
       %{
         data
         | adapter: adapter,
           language: adapter.name(),
           argv_template: argv,
           env_template: env,
-          baseline_worker: worker
+          baseline_worker: worker,
+          toolchain_meta: metadata
       }
     else
       {:error, reason} ->
@@ -81,10 +108,18 @@ defmodule Mutator.Pipelines.PrepareRun do
     cwd = data.baseline_worker.project
     log = Path.join(data.ws.logs, "baseline.log")
 
-    case ProcessRunner.run(argv, cwd: cwd, log_path: log, timeout_ms: @baseline_deadline_ms, env: env) do
-      {:ok, %{exit_code: 0, elapsed_ms: elapsed}} ->
-        timeout_ms = mutant_timeout(elapsed)
-        %{data | baseline_ms: elapsed, mutant_timeout_ms: timeout_ms}
+    case ProcessRunner.run(argv,
+           cwd: cwd,
+           log_path: log,
+           timeout_ms: @baseline_deadline_ms,
+           env: env
+         ) do
+      {:ok, %{exit_code: 0, elapsed_ms: elapsed} = result} ->
+        if data.adapter.id() == :javascript do
+          accept_javascript_baseline(data, result)
+        else
+          %{data | baseline_ms: elapsed, mutant_timeout_ms: mutant_timeout(elapsed)}
+        end
 
       {:ok, %{tail: tail}} ->
         %{data | error: {:baseline_failed, String.slice(tail, 0, 2_000)}}
@@ -97,6 +132,16 @@ defmodule Mutator.Pipelines.PrepareRun do
   def run_baseline(%__MODULE__{} = data, _opts), do: data
 
   def scan_and_persist(%__MODULE__{error: nil} = data, _opts) do
+    if Runs.get_run(data.run_id).state == "cancelled" do
+      %{data | error: {:cancelled, "run cancelled during preparation"}}
+    else
+      scan_sites(data)
+    end
+  end
+
+  def scan_and_persist(%__MODULE__{} = data, _opts), do: data
+
+  defp scan_sites(%__MODULE__{} = data) do
     Runs.transition(Runs.get_run(data.run_id), "scanning")
 
     scope = run_scope(data.run_id)
@@ -132,13 +177,32 @@ defmodule Mutator.Pipelines.PrepareRun do
     }
   end
 
-  def scan_and_persist(%__MODULE__{} = data, _opts), do: data
-
   def on_unexpected_error(error, %__MODULE__{} = data, _opts) do
     %{data | error: {:unexpected, inspect(Exception.message(error))}}
   end
 
   # -- helpers ---------------------------------------------------------------
+
+  defp accept_javascript_baseline(data, %{elapsed_ms: elapsed, tail: tail} = result) do
+    with :survived <- data.adapter.classify({:ok, result}),
+         {:ok, metadata} <- data.adapter.result_metadata(tail) do
+      toolchain = Map.put(data.toolchain_meta, "runtime", metadata["runtime"])
+      Runs.transition(Runs.get_run(data.run_id), "baselining", %{toolchain: toolchain})
+
+      %{
+        data
+        | baseline_ms: elapsed,
+          mutant_timeout_ms: mutant_timeout(elapsed),
+          toolchain_meta: toolchain
+      }
+    else
+      _ ->
+        %{
+          data
+          | error: {:baseline_failed, "invalid JavaScript runner result or no executed tests"}
+        }
+    end
+  end
 
   defp mutant_timeout(baseline_ms) do
     # Warm-lane mutants recompile one file, not the tree: 3x the (cold)
