@@ -82,7 +82,8 @@ defmodule Mutator.Execution.ProcessRunner do
     after
       # The group can outlive its leader. Service-mode JS children share
       # this group; retain its identity even after the port has exited.
-      System.cmd("/bin/kill", ["-9", "-#{group_id}"], stderr_to_stdout: true)
+      # The separator keeps a negative PGID from being parsed as a signal option.
+      System.cmd("/bin/kill", ["-9", "--", "-#{group_id}"], stderr_to_stdout: true)
     end
   end
 
@@ -142,7 +143,7 @@ defmodule Mutator.Execution.ProcessRunner do
     with {:os_pid, os_pid} <- Port.info(port, :os_pid),
          true <- is_integer(os_pid) do
       sig = if signal == :kill, do: 9, else: 15
-      System.cmd("/bin/kill", ["-#{sig}", "-#{os_pid}"])
+      System.cmd("/bin/kill", ["-#{sig}", "--", "-#{os_pid}"])
     else
       _ -> :ok
     end
