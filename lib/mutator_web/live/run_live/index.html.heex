@@ -3,10 +3,16 @@
     💥🔫 code<span class="text-rose-500">MUTATOR</span>
   </h1>
   <p class="mt-1 text-sm text-slate-600">
-    Mutation testing as a service for Elixir, Zig, Kotlin and Swift. The subject is cloned into
+    Mutation testing for Zig and Rust, plus JavaScript/TypeScript through an explicit Node 26 profile.
+    Elixir and Swift adapters and Kotlin detection are also available. The subject is copied into
     <code class="rounded bg-slate-100 px-1">temporary_subject/</code>
     and never touched.
     Agents: <.link href="/agents" class="text-sky-700 hover:underline">CLI &amp; JSON API instructions</.link>.
+  </p>
+  <p class="mt-2 text-sm text-slate-600">
+    JavaScript/TypeScript requires <code class="rounded bg-slate-100 px-1">.codemutator.json</code>,
+    Node's built-in test runner and physical dependency files. TypeScript uses a separate compiler check.
+    JSX/TSX execution and linked dependency trees are outside this profile.
   </p>
 
   <.simple_form for={@form} phx-submit="submit" class="mt-6">

@@ -11,7 +11,8 @@ defmodule Mutator.Languages.Detector do
     Mutator.Languages.ElixirLang,
     Mutator.Languages.Swift,
     Mutator.Languages.Kotlin,
-    Mutator.Languages.Rust
+    Mutator.Languages.Rust,
+    Mutator.Languages.JavaScript
   ]
 
   def adapters, do: @adapters
@@ -21,6 +22,17 @@ defmodule Mutator.Languages.Detector do
   `{:error, {:unsupported, found}}` listing what was matched (if any).
   """
   def detect(subject_root) do
+    if File.exists?(Path.join(subject_root, ".codemutator.json")) do
+      case Mutator.Languages.JavaScript.detect(subject_root) do
+        :ok -> {:ok, Mutator.Languages.JavaScript}
+        error -> error
+      end
+    else
+      detect_markers(subject_root)
+    end
+  end
+
+  defp detect_markers(subject_root) do
     matches =
       Enum.filter(@adapters, fn adapter ->
         adapter.detect(subject_root) == :ok
@@ -38,6 +50,14 @@ defmodule Mutator.Languages.Detector do
   `scope` is an optional path-substring filter from the submit form.
   """
   def mutable_files(adapter, subject_root, scope \\ nil) do
+    if adapter == Mutator.Languages.JavaScript do
+      adapter.mutable_files(subject_root, scope)
+    else
+      mutable_language_files(adapter, subject_root, scope)
+    end
+  end
+
+  defp mutable_language_files(adapter, subject_root, scope) do
     exts = adapter.source_extensions()
 
     subject_root

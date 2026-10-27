@@ -6,7 +6,8 @@ description: Submit a local codebase to the codeMUTATOR mutation-testing service
 # codeMUTATOR — mutation testing as a service
 
 Service: **http://localhost:4300** (production instance, loopback only).
-CLI: `bin/codemutator` in a codeMUTATOR checkout.
+CLI: `/Volumes/Centaurus-A/__centaurus_repos/mutator/bin/codemutator`
+Deployed app: `/Users/lloyd/PRODUCTION_SERVERS/apps/codemutator` (start/stop via `bin/mutator`).
 
 ## When to use
 
@@ -17,7 +18,7 @@ CLI: `bin/codemutator` in a codeMUTATOR checkout.
 ## Core workflow
 
 ```bash
-B=/path/to/codemutator/bin/codemutator
+B=/Volumes/Centaurus-A/__centaurus_repos/mutator/bin/codemutator
 
 # 1. submit and wait (bounded sample first!)
 $B run /abs/path/to/project --scope lib/ --limit 12 --wait

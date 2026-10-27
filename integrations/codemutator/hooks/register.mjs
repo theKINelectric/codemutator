@@ -8,8 +8,8 @@
 //     session+project). Stop boundaries poll once — never a minutes-long wait.
 //   - Cancel via /codemutator-cancel verifies a terminal state; the service
 //     drains in-flight work, the workspace removal is the cleanup receipt.
-//   - Source is fingerprinted at submission (scoped contents + manifest bytes
-//     + tool identity). A working tree that changed since submission produces
+//   - Source is fingerprinted at submission (project inputs for JS/TS profiles,
+//     otherwise scoped source, plus manifest bytes and tool identity). A changed tree produces
 //     a STALE refusal — never promoted to current.
 //   - Score = killed/(killed+survived); invalid/error/cancelled stay out of
 //     the denominator and are shown as counts. Denominator 0 -> no score.
@@ -18,20 +18,23 @@
 
 const NOTICE_MAX = 2000;
 const FILE_CAP = 512;
+const ENTRY_CAP = 4096;
 const TOTAL_CAP = 8 * 1024 * 1024;
 const RESP_CAP = 256 * 1024;
 const MAX_MUTANTS = 9;
 const MAX_BUDGET_MS = 120_000;
 const SCHEMA = "codemutator-mod/1";
-const TOOL = "codemutator-mod@0.2.0";
+const TOOL = "codemutator-mod@0.3.0";
 
-const SRC_EXTS = /\.(ex|exs|zig|kt|kts|swift|rs)$/;
+const SRC_EXTS = /\.(ex|exs|zig|kt|kts|swift|rs|js|jsx|mjs|cjs|ts|tsx|mts|cts)$/;
 const MANIFESTS = new Set([
   "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "rust-toolchain",
   "build.rs", ".cargo/config", ".cargo/config.toml",
   "build.zig", "build.zig.zon", "mix.exs", "mix.lock", "Package.swift",
   "Package.resolved", "settings.gradle", "settings.gradle.kts",
   "build.gradle", "build.gradle.kts", "gradle.properties", ".mise.toml",
+  ".codemutator.json", "package.json", "package-lock.json", "npm-shrinkwrap.json",
+  "yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb", "tsconfig.json",
 ]);
 const SKIP_DIRS = new Set([
   ".git", "deps", "_build", "target", "node_modules", "vendor", "dist",
@@ -60,72 +63,103 @@ async function canonicalRoot($, cwd) {
   }
 }
 
-async function sha256(text) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+async function sha256(value) {
+  const digest = await crypto.subtle.digest("SHA-256", typeof value === "string" ? new TextEncoder().encode(value) : value);
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Snapshot identity: the scoped tree's contents plus the root manifest bytes —
-// the things that change what a run would do.
+// The host's fs.read normally returns text. Only round-trippable UTF-8 text or
+// actual byte buffers can support a content digest; lossy decoding is unknown.
+function inputBytes(value) {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (typeof value !== "string" || /\uFFFD|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(value)) {
+    throw new Error("lossless file bytes unavailable from host encoding");
+  }
+  return new TextEncoder().encode(value);
+}
+
+// JS/TS profiles copy the physical project, so tests, declarations, config and
+// fixtures outside the mutation scope must affect freshness. Dependency/build
+// caches remain excluded: this proves project-source freshness, not runtime identity.
 async function fingerprint($, root, scope) {
-  const base = scope ? `${root}/${scope.replace(/\/+$/, "")}` : root;
-  const files = [];
+  let wholeProject;
+  try { wholeProject = await $.fs.exists(`${root}/.codemutator.json`); }
+  catch { return { error: "project profile existence unreadable" }; }
+  const kind = wholeProject ? "project-inputs" : "scoped-source";
+  const prefix = wholeProject ? "" : (scope || "").replace(/\/+$/, "");
+  const base = prefix ? `${root}/${prefix}` : root;
+  const files = new Set();
   const stack = [""];
   let truncated = false;
+  let entriesSeen = 0;
 
-  while (stack.length && files.length <= FILE_CAP) {
+  while (stack.length && !truncated) {
     const rel = stack.pop();
     let entries;
     try {
       entries = await $.fs.list(rel ? `${base}/${rel}` : base);
     } catch {
-      return { error: `scope ${rel || "."} unreadable` };
+      return { error: `fingerprint directory ${rel || "."} unreadable`, kind };
     }
     for (const ent of entries) {
+      if (++entriesSeen > ENTRY_CAP) { truncated = true; break; }
       const child = rel ? `${rel}/${ent.name}` : ent.name;
-      if (ent.isLink) continue;
+      if (ent.isLink) {
+        if (wholeProject) return { error: `fingerprint input ${child} is a link; physical project inputs required`, kind };
+        continue;
+      }
       if (ent.kind === "dir") {
         if (!SKIP_DIRS.has(ent.name)) stack.push(child);
-      } else if (SRC_EXTS.test(ent.name)) {
-        files.push(child);
+      } else if (ent.kind === "file" && (wholeProject || SRC_EXTS.test(ent.name))) {
+        files.add(prefix ? `${prefix}/${child}` : child);
+        if (files.size > FILE_CAP) { truncated = true; break; }
+      } else if (wholeProject && ent.kind !== "file") {
+        return { error: `fingerprint input ${child} is not a regular file`, kind };
       }
     }
   }
-  files.sort();
-  if (files.length > FILE_CAP) truncated = true;
 
-  const parts = [`tool:${TOOL}`, `scope:${scope || "."}`];
-  const errors = [];
-  let bytes = 0;
-  for (const rel of files.slice(0, FILE_CAP)) {
-    let text;
-    try {
-      text = await $.fs.read(`${base}/${rel}`);
-    } catch {
-      parts.push(`${rel}:unreadable`);
-      errors.push(`${rel} unreadable`);
-      continue;
-    }
-    bytes += new TextEncoder().encode(text).length;
-    if (bytes > TOTAL_CAP) { truncated = true; break; }
-    parts.push(`${rel}:${await sha256(text)}`);
-  }
-
-  // Manifest bytes ride in the fingerprint (config digest) — including
-  // .cargo/ config and build.rs, which the scoped workspace copy now carries.
-  const manifestParts = [];
+  // Root manifests participate even for legacy scoped projects. Their bytes
+  // share the same caps; unreadable existing files are never treated as absent.
+  const manifests = new Set();
   for (const name of MANIFESTS) {
     try {
-      manifestParts.push(`${name}:${await sha256(await $.fs.read(`${root}/${name}`))}`);
-    } catch { /* absent */ }
+      if (await $.fs.exists(`${root}/${name}`)) {
+        manifests.add(name);
+        files.add(name);
+      }
+    } catch {
+      return { error: `fingerprint manifest ${name} unreadable`, kind };
+    }
+  }
+  if (files.size > FILE_CAP) truncated = true;
+  if (truncated) return { kind, files: files.size, bytes: 0, truncated: true };
+
+  const parts = [`tool:${TOOL}`, `scope:${scope || "."}`, `kind:${kind}`];
+  const manifestParts = [];
+  let bytes = 0;
+  for (const rel of [...files].sort()) {
+    let content;
+    try {
+      content = inputBytes(await $.fs.read(`${root}/${rel}`));
+    } catch (e) {
+      return { error: `fingerprint input ${rel} unreadable: ${String(e.message || e)}`, kind };
+    }
+    bytes += content.byteLength;
+    if (bytes > TOTAL_CAP) return { kind, files: files.size, bytes, truncated: true };
+    const part = `${rel}:${await sha256(content)}`;
+    parts.push(part);
+    if (manifests.has(rel)) manifestParts.push(part);
   }
 
   return {
-    digest: await sha256(parts.concat(manifestParts.sort()).join("\n")),
-    files: files.length,
+    digest: await sha256(parts.join("\n")),
+    config_digest: await sha256(manifestParts.join("\n")),
+    kind,
+    files: files.size,
     bytes,
-    truncated,
-    errors,
+    truncated: false,
     manifests: manifestParts.length,
   };
 }
@@ -264,7 +298,8 @@ async function reportRun($, cfg, rootKey, state, session, runId) {
   const out = await call($, cfg, "GET", `/api/runs/${runId}/outcomes`);
   const outcomes = out.ok && out.body && Array.isArray(out.body.outcomes) ? out.body.outcomes : null;
   const fpNow = await fingerprint($, rec.root, rec.scope);
-  const stale = fpNow.digest !== rec.source_digest;
+  const fingerprintComplete = !fpNow.error && !fpNow.truncated && typeof fpNow.digest === "string";
+  const stale = fingerprintComplete ? fpNow.digest !== rec.source_digest : null;
   const kind =
     run.state === "completed" ? "completed"
     : run.state === "cancelled" ? "cancelled"
@@ -282,7 +317,10 @@ async function reportRun($, cfg, rootKey, state, session, runId) {
     submitted_at: rec.submitted_at,
     terminal_at: run.finished_at || null,
     source_digest: rec.source_digest,
-    digest_at_report: fpNow.digest,
+    digest_at_report: fpNow.digest || null,
+    fingerprint_complete: fingerprintComplete,
+    fingerprint_kind: fpNow.kind || null,
+    fingerprint_error: fpNow.error || (fpNow.truncated ? "fingerprint bounds exceeded" : null),
     stale,
     config_digest: rec.config_digest,
     tool: TOOL,
@@ -294,6 +332,10 @@ async function reportRun($, cfg, rootKey, state, session, runId) {
   const path = await evidence($, cfg, rootKey, `run-${runId}.json`, envelope);
   delete state.runs[runId];
   await saveState($, cfg, rootKey, state);
+
+  if (!fingerprintComplete) {
+    return { notice: fit(`codemutator: unknown — run #${runId} ended ${run.state}, but the current fingerprint is incomplete (${fpNow.error || "bounds exceeded"}); refusing to promote it.\nevidence: ${path}`) };
+  }
 
   if (stale) {
     return { notice: fit(`codemutator: stale — run #${runId} ended ${run.state}, but the working tree changed since submission; refusing to promote it.\nevidence: ${path}\nsource unchanged by the service itself; resubmit for a current verdict.`) };
@@ -336,7 +378,7 @@ async function cmdRun($, cfg, args, session) {
 
   // Reserve the one-run slot BEFORE the POST: a restart or repeat command
   // during the flight window cannot create a second submission.
-  const configDigest = await sha256(`${fp.manifests}`);
+  const configDigest = fp.config_digest;
   const uncertain = {
     at: Date.now(), client_ref: `codemutator-mod:${session}:${Date.now()}`,
     root, scope, source_digest: fp.digest, config_digest: configDigest,
@@ -375,7 +417,7 @@ async function cmdRun($, cfg, args, session) {
     root,
     scope,
     source_digest: fp.digest,
-    config_digest: await sha256(`${fp.manifests}`),
+    config_digest: configDigest,
     submitted_at: Date.now(),
     mutant_limit: mutantLimit,
     budget_ms: budget,

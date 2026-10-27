@@ -355,6 +355,11 @@ defmodule Mutator.Scanner do
   # -- scanning --------------------------------------------------------------
 
   @doc "Scan one file's bytes; returns sites in byte order."
+  def scan(language, rel_path, source)
+      when language in [:javascript, :typescript] and is_binary(source) do
+    Mutator.Scanner.JavaScript.scan(rel_path, source)
+  end
+
   def scan(language, rel_path, source) when is_binary(source) do
     profile = profile(language)
     config = lexer_config(language)

@@ -36,7 +36,9 @@ defmodule Mutator.MixProject do
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.10"},
       {:ecto_sqlite3, ">= 0.0.0"},
-      {:flowextra, "~> 0.6"},
+      {:flowextra,
+       git: "https://github.com/theKINelectric/flow_extra.git",
+       ref: "81e8f3b1fa959666dee5a81b96f5cd8c9ee1341e"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.0.0"},
@@ -55,6 +57,7 @@ defmodule Mutator.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
+      {:js_ts_parser, path: "../js_ts_parser/elixir"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"}
     ]

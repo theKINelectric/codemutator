@@ -143,7 +143,18 @@ defmodule Mutator.Pipelines.ExecuteMutant do
       :survived -> %{data | status: "survived"}
       {:killed, reason} -> %{data | status: "killed", reason: Atom.to_string(reason)}
       :invalid -> %{data | status: "invalid"}
-      :unclassified -> %{data | status: "error", reason: "unclassified"}
+      :unclassified -> %{data | status: "error", reason: runner_error(data.adapter, tail)}
+    end
+  end
+
+  defp runner_error(adapter, tail) do
+    if function_exported?(adapter, :result_metadata, 1) do
+      case adapter.result_metadata(tail) do
+        {:ok, %{"status" => "error", "reason" => reason}} when is_binary(reason) -> reason
+        _ -> "unclassified"
+      end
+    else
+      "unclassified"
     end
   end
 

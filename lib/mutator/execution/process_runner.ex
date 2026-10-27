@@ -68,14 +68,23 @@ defmodule Mutator.Execution.ProcessRunner do
     port = Port.open({:spawn_executable, hd(wrapped)}, port_opts)
     started = System.monotonic_time(:millisecond)
 
-    await(%{
-      port: port,
-      log: log,
-      timeout_at: started + timeout,
-      started: started,
-      buffer: "",
-      log_path: log_path
-    })
+    {:os_pid, group_id} = Port.info(port, :os_pid)
+
+    try do
+      await(%{
+        port: port,
+        log: log,
+        timeout_at: started + timeout,
+        started: started,
+        buffer: "",
+        log_path: log_path
+      })
+    after
+      # The group can outlive its leader. Service-mode JS children share
+      # this group; retain its identity even after the port has exited.
+      # The separator keeps a negative PGID from being parsed as a signal option.
+      System.cmd("/bin/kill", ["-9", "--", "-#{group_id}"], stderr_to_stdout: true)
+    end
   end
 
   defp await(%{port: port} = st) do
@@ -134,7 +143,7 @@ defmodule Mutator.Execution.ProcessRunner do
     with {:os_pid, os_pid} <- Port.info(port, :os_pid),
          true <- is_integer(os_pid) do
       sig = if signal == :kill, do: 9, else: 15
-      System.cmd("/bin/kill", ["-#{sig}", "-#{os_pid}"])
+      System.cmd("/bin/kill", ["-#{sig}", "--", "-#{os_pid}"])
     else
       _ -> :ok
     end

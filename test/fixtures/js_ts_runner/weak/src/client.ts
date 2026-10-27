@@ -1,0 +1,3 @@
+export function isSuccess(status: number): boolean {
+  return status >= 200 && status < 300;
+}

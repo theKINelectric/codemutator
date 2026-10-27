@@ -398,3 +398,135 @@ test("restart uncertain + operator resolves none: slot frees, next submit procee
   const r2 = await host.run("command.run", { command: "codemutator-run", args: "src 4 120000" });
   assert.match(r2.text, /run #66 submitted/);
 });
+
+const JS_PROFILE = JSON.stringify({
+  schemaVersion: 1, language: "javascript-typescript",
+  runner: { kind: "node-test", files: ["test/client.test.mjs"] },
+  typecheck: { kind: "typescript", project: "config/tsconfig.json" },
+  source: { include: ["src/**"], exclude: [] },
+});
+const JS_PROJECT = {
+  "/proj/.codemutator.json": JS_PROFILE,
+  "/proj/src/client.ts": "export const eligible = (age: number) => age >= 18;\n",
+  "/proj/test/client.test.mjs": "import assert from 'node:assert/strict';\n",
+  "/proj/types/client.d.ts": "declare const age: number;\n",
+  "/proj/types/client.d.mts": "export declare const moduleAge: number;\n",
+  "/proj/types/client.d.cts": "export declare const commonAge: number;\n",
+  "/proj/package.json": '{"type":"module","devDependencies":{"typescript":"6.0.3"}}',
+  "/proj/package-lock.json": '{"lockfileVersion":3,"packages":{}}',
+  "/proj/config/tsconfig.json": '{"extends":"./base.json","include":["../src"]}',
+  "/proj/config/base.json": '{"compilerOptions":{"strict":true}}',
+  "/proj/test/fixtures/client.json": '{"age":18}',
+};
+
+function terminalHost(fs) {
+  const host = makeHost({
+    fs,
+    service: {
+      submit: { status: 201, body: { id: 101, state: "queued", terminal: false } },
+      status: { status: 200, body: { id: 101, state: "completed", terminal: true } },
+      outcomes: { status: 200, body: { run_id: 101, state: "completed", outcomes: [{ site_id: 1, status: "killed" }] } },
+    },
+  });
+  register(host.on);
+  return host;
+}
+
+async function submitAndReport(host, edit = () => {}) {
+  const sub = await host.run("command.run", { command: "codemutator-run", args: "src" });
+  assert.match(sub.text, /run #101 submitted/);
+  edit(host.fsDump());
+  const stop = await host.run("classic.Stop", { cwd: "/proj", hook_event_name: "Stop", stop_hook_active: false });
+  const envelopePath = Object.keys(host.fsDump()).find((p) => p.endsWith("/run-101.json"));
+  return { notice: (stop.additionalContext || []).join(""), envelope: JSON.parse(host.fsDump()[envelopePath]) };
+}
+
+for (const extension of ["js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts"]) {
+  test(`editing .${extension} source invalidates a submitted Mod result`, async () => {
+    const path = `/proj/src/eligible.${extension}`;
+    const result = await submitAndReport(terminalHost({ [path]: "const eligible = age => age >= 18;\n" }),
+      (fs) => { fs[path] += "// changed\n"; });
+    assert.match(result.notice, /stale.*refusing to promote/s);
+    assert.equal(result.envelope.stale, true);
+  });
+}
+
+for (const path of Object.keys(JS_PROJECT).filter((p) => !p.includes("/src/"))) {
+  test(`JS profile freshness includes ${path.slice(6)} outside mutation scope`, async () => {
+    const result = await submitAndReport(terminalHost(JS_PROJECT), (fs) => { fs[path] += " "; });
+    assert.match(result.notice, /stale.*refusing to promote/s);
+    assert.equal(result.envelope.stale, true);
+  });
+}
+
+test("JS project includes new non-source inputs and raw bytes when supplied by the host", async () => {
+  const host = terminalHost({ ...JS_PROJECT, "/proj/test/fixtures/body.bin": new Uint8Array([0, 255, 254, 1]) });
+  const result = await submitAndReport(host, (fs) => { fs["/proj/test/fixtures/body.bin"] = new Uint8Array([0, 254, 255, 1]); });
+  assert.match(result.notice, /stale.*refusing to promote/s);
+});
+
+test("JS freshness refuses lossy host text instead of trusting binary replacement decoding", async () => {
+  const host = terminalHost({ ...JS_PROJECT, "/proj/test/fixtures/body.bin": "\ufffd" });
+  const sub = await host.run("command.run", { command: "codemutator-run", args: "src" });
+  assert.match(sub.text, /unknown.*(lossless|byte|encoding)/s);
+  assert.equal(host.fetchCalls.filter((c) => c.startsWith("POST ")).length, 0);
+});
+
+test("JS project fingerprint caps include inputs outside mutation scope", async () => {
+  const fs = { ...JS_PROJECT };
+  for (let i = 0; i < 513; i++) fs[`/proj/test/data/${i}.json`] = "{}";
+  const host = terminalHost(fs);
+  const sub = await host.run("command.run", { command: "codemutator-run", args: "src" });
+  assert.match(sub.text, /unknown.*exceeds fingerprint bounds/s);
+  assert.equal(host.fetchCalls.filter((c) => c.startsWith("POST ")).length, 0);
+});
+
+test("oversize JS manifest is counted in the byte bound", async () => {
+  const host = terminalHost({ ...JS_PROJECT, "/proj/package-lock.json": " ".repeat(8 * 1024 * 1024) });
+  const sub = await host.run("command.run", { command: "codemutator-run", args: "src" });
+  assert.match(sub.text, /unknown.*exceeds fingerprint bounds/s);
+  assert.equal(host.fetchCalls.filter((c) => c.startsWith("POST ")).length, 0);
+});
+
+test("unreadable project input prevents submission and later freshness promotion", async () => {
+  const host = terminalHost(JS_PROJECT);
+  const read = host.$.fs.read;
+  host.$.fs.read = async (p) => { if (p === "/proj/test/client.test.mjs") throw Error("EACCES"); return read(p); };
+  const sub = await host.run("command.run", { command: "codemutator-run", args: "src" });
+  assert.match(sub.text, /unknown.*unreadable/s);
+  assert.equal(host.fetchCalls.filter((c) => c.startsWith("POST ")).length, 0);
+
+  const submitted = terminalHost(JS_PROJECT);
+  const result = await submitAndReport(submitted, () => {
+    const original = submitted.$.fs.read;
+    submitted.$.fs.read = async (p) => { if (p === "/proj/test/client.test.mjs") throw Error("EACCES"); return original(p); };
+  });
+  assert.match(result.notice, /unknown.*fingerprint.*refusing to promote/s);
+  assert.equal(result.envelope.fingerprint_complete, false);
+});
+
+test("fingerprint that grows beyond its cap after submission cannot promote a verdict", async () => {
+  const result = await submitAndReport(terminalHost(JS_PROJECT), (fs) => {
+    for (let i = 0; i < 513; i++) fs[`/proj/test/data/${i}.json`] = "{}";
+  });
+  assert.match(result.notice, /unknown.*fingerprint.*refusing to promote/s);
+  assert.equal(result.envelope.fingerprint_complete, false);
+});
+
+test("JS config digest reflects changed manifest bytes with unchanged manifest count", async () => {
+  const before = await submitAndReport(terminalHost(JS_PROJECT));
+  const after = await submitAndReport(terminalHost({ ...JS_PROJECT, "/proj/.codemutator.json": `${JS_PROFILE} ` }));
+  assert.equal(before.envelope.stale, false);
+  assert.equal(after.envelope.stale, false);
+  assert.notEqual(before.envelope.config_digest, after.envelope.config_digest);
+});
+
+test("documented dependency/build caches do not invalidate a JS source fingerprint", async () => {
+  const host = terminalHost({ ...JS_PROJECT, "/proj/node_modules/pkg/index.js": "module.exports = 1", "/proj/dist/client.js": "build 1" });
+  const result = await submitAndReport(host, (fs) => {
+    fs["/proj/node_modules/pkg/index.js"] += "// dependency changed";
+    fs["/proj/dist/client.js"] += "// regenerated";
+  });
+  assert.equal(result.envelope.stale, false);
+  assert.match(result.notice, /completed.*score 1\/1/s);
+});

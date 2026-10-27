@@ -16,7 +16,7 @@
       </h1>
       <p class="mt-4 max-w-2xl text-zinc-400">
         Submit a local codebase. codeMUTATOR clones it, applies one mutation at a
-        time to a private copy, runs the project's own tests, and reports which
+        time to a private copy, runs the configured tests, and reports which
         mutants your suite kills — per function, with full logs. The original
         directory is never touched.
       </p>
@@ -24,7 +24,12 @@
       <div class="mt-8 grid gap-3 sm:grid-cols-3">
         <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
           <div class="text-xs uppercase tracking-wide text-zinc-500">Languages</div>
-          <div class="mt-1 text-sm">Zig 0.16 qualified · Elixir · Swift · Kotlin (detect)</div>
+          <div class="mt-1 text-sm">
+            Zig 0.16 · Rust · JavaScript/TypeScript (explicit Node 26 profile)
+          </div>
+          <div class="mt-2 text-xs text-zinc-500">
+            Elixir and Swift adapters · Kotlin detection
+          </div>
         </div>
         <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
           <div class="text-xs uppercase tracking-wide text-zinc-500">Agents first</div>
